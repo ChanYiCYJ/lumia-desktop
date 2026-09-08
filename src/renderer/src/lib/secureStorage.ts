@@ -47,21 +47,15 @@ function encryptValue(value: string): string {
 export function enableSecureStorage(): void {
   if (!isNative()) return
   // 防止热更新/重复调用重复包裹
-  if ((Storage.prototype as unknown as Record<string, unknown>).__lumiaPatched)
-    return
-  ;(Storage.prototype as unknown as Record<string, unknown>).__lumiaPatched =
-    true
+  if ((Storage.prototype as unknown as Record<string, unknown>).__lumiaPatched) return
+  ;(Storage.prototype as unknown as Record<string, unknown>).__lumiaPatched = true
 
   Storage.prototype.getItem = function (this: Storage, key: string): string | null {
     const v = origGet.call(this, key)
     return isSensitiveKey(key) && v ? decryptValue(v) : v
   } as typeof Storage.prototype.getItem
 
-  Storage.prototype.setItem = function (
-    this: Storage,
-    key: string,
-    value: string
-  ): void {
+  Storage.prototype.setItem = function (this: Storage, key: string, value: string): void {
     origSet.call(this, key, isSensitiveKey(key) ? encryptValue(value) : value)
   } as typeof Storage.prototype.setItem
 }

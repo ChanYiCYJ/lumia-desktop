@@ -14,21 +14,17 @@ const api = {
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke(IPC.App_GetInfo),
 
   /** 文件 KV 存储（userData/data/*.json，P4 数据层） */
-  storageGet: (key: string): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Storage_Get, key),
+  storageGet: (key: string): Promise<unknown> => ipcRenderer.invoke(IPC.Storage_Get, key),
   storageSet: (key: string, value: unknown): Promise<void> =>
     ipcRenderer.invoke(IPC.Storage_Set, key, value),
-  storageDelete: (key: string): Promise<void> =>
-    ipcRenderer.invoke(IPC.Storage_Delete, key),
+  storageDelete: (key: string): Promise<void> => ipcRenderer.invoke(IPC.Storage_Delete, key),
   storageKeys: (): Promise<string[]> => ipcRenderer.invoke(IPC.Storage_Keys),
 
   /** 密钥安全存储（safeStorage 加密，P4） */
-  secretsGet: (key: string): Promise<string | null> =>
-    ipcRenderer.invoke(IPC.Secrets_Get, key),
+  secretsGet: (key: string): Promise<string | null> => ipcRenderer.invoke(IPC.Secrets_Get, key),
   secretsSet: (key: string, value: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC.Secrets_Set, key, value),
-  secretsDelete: (key: string): Promise<void> =>
-    ipcRenderer.invoke(IPC.Secrets_Delete, key),
+  secretsDelete: (key: string): Promise<void> => ipcRenderer.invoke(IPC.Secrets_Delete, key),
   /** 同步加解密（localStorage 透明加密层用；仅处理小字符串） */
   secretEncryptSync: (value: string): string =>
     ipcRenderer.sendSync(IPC.Secrets_EncryptSync, value),
@@ -36,18 +32,12 @@ const api = {
     ipcRenderer.sendSync(IPC.Secrets_DecryptSync, value),
 
   /** 网络层（P3 本地引擎 / 远程代理） */
-  agentSearch: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Search, req),
-  agentFetch: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Fetch, req),
-  agentImage: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Image, req),
-  agentNotion: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Notion, req),
-  agentTts: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Tts, req),
-  agentLive2d: (req: unknown): Promise<unknown> =>
-    ipcRenderer.invoke(IPC.Agent_Live2d, req),
+  agentSearch: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Search, req),
+  agentFetch: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Fetch, req),
+  agentImage: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Image, req),
+  agentNotion: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Notion, req),
+  agentTts: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Tts, req),
+  agentLive2d: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Live2d, req),
 
   /** 文件对话框（导入/导出） */
   dialogSaveFile: (req: unknown): Promise<string | null> =>

@@ -4,9 +4,7 @@
  */
 export function isNative(): boolean {
   return (
-    typeof window !== 'undefined' &&
-    !!window.api &&
-    typeof window.api.agentSearch === 'function'
+    typeof window !== 'undefined' && !!window.api && typeof window.api.agentSearch === 'function'
   )
 }
 

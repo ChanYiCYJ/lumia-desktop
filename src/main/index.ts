@@ -54,9 +54,7 @@ if (!app.requestSingleInstanceLock()) {
 
     // 密钥安全存储
     ipcMain.handle(IPC.Secrets_Get, (_e, key: string) => secretsGet(key))
-    ipcMain.handle(IPC.Secrets_Set, (_e, key: string, value: string) =>
-      secretsSet(key, value)
-    )
+    ipcMain.handle(IPC.Secrets_Set, (_e, key: string, value: string) => secretsSet(key, value))
     ipcMain.handle(IPC.Secrets_Delete, (_e, key: string) => secretsDelete(key))
 
     // 同步加解密（renderer localStorage 透明加密层）

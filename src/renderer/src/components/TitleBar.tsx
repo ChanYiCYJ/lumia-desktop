@@ -13,9 +13,7 @@ export function TitleBar(): React.JSX.Element {
       <span className="text-xs font-semibold tracking-wide text-gray-600 dark:text-gray-400">
         Lumia
       </span>
-      <span className="ml-2 text-[11px] text-gray-400 dark:text-gray-600">
-        Agent Desktop
-      </span>
+      <span className="ml-2 text-[11px] text-gray-400 dark:text-gray-600">Agent Desktop</span>
       <div
         className="ml-auto flex h-full items-center"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

@@ -26,10 +26,7 @@ export async function synthesize(text: string, voice?: string): Promise<TtsResul
   if (!cleaned) return { ok: false, error: 'empty text' }
   try {
     const tts = new MsEdgeTTS()
-    await tts.setMetadata(
-      voice || 'zh-CN-XiaoxiaoNeural',
-      OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS
-    )
+    await tts.setMetadata(voice || 'zh-CN-XiaoxiaoNeural', OUTPUT_FORMAT.WEBM_24KHZ_16BIT_MONO_OPUS)
     const { audioStream } = tts.toStream(cleaned)
     const chunks: Buffer[] = []
     for await (const chunk of audioStream) {

@@ -29,7 +29,11 @@ export function registerAgentIpc(): void {
         const res = await fetch(target)
         if (!res.ok) throw new Error('TTS upstream ' + res.status)
         const buf = Buffer.from(await res.arrayBuffer())
-        return { ok: true, audio: buf.toString('base64'), contentType: res.headers.get('content-type') || 'audio/mpeg' }
+        return {
+          ok: true,
+          audio: buf.toString('base64'),
+          contentType: res.headers.get('content-type') || 'audio/mpeg'
+        }
       } catch (e) {
         return { ok: false, error: String((e as Error)?.message || e) }
       }

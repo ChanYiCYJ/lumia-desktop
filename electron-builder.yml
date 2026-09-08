@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: lumia-desktop
+appId: com.lumia.desktop
+productName: Lumia Desktop
 directories:
   buildResources: build
 files:
@@ -13,11 +13,14 @@ asarUnpack:
   - resources/**
 win:
   executableName: lumia-desktop
+  icon: build/icon.ico
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+  oneClick: false
+  allowToChangeInstallationDirectory: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -31,13 +34,10 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: ChanYiCYJ
   category: Utility
+  icon: build/icon.png
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates

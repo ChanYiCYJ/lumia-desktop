@@ -1,120 +1,115 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { pageApi } from "../lib/api";
-import { AI_CHAT_MARKER, decodeKey, type AIChatConfig } from "../lib/types";
-import { useAuth } from "../lib/auth";
-import { useSite } from "../lib/site";
-import { getAIConfig } from "../lib/ai";
-import { TypeWriter } from "../components/Spinner";
-import { AIChat, type BotItem } from "../components/AIChat";
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { pageApi } from '../lib/api'
+import { AI_CHAT_MARKER, decodeKey, type AIChatConfig } from '../lib/types'
+import { useAuth } from '../lib/auth'
+import { useSite } from '../lib/site'
+import { getAIConfig } from '../lib/ai'
+import { TypeWriter } from '../components/Spinner'
+import { AIChat, type BotItem } from '../components/AIChat'
 
 /** 桌面端本地回退：无后端时用本地模型配置（kimo_ai_bots / 自定义模型）构造 bot */
 function localBotFallback(): BotItem[] {
   try {
-    const cfg = getAIConfig();
+    const cfg = getAIConfig()
     if (cfg.enabled && cfg.endpoint) {
-      const name = cfg.model || "Lumia 助手";
+      const name = cfg.model || 'Lumia 助手'
       return [
         {
           id: 0,
           name,
           config: {
             ...(cfg as unknown as AIChatConfig),
-            botName: name,
+            botName: name
           },
           page: {
             id: 0,
             name,
-            content: "",
-            type: "html",
-            status: 1,
-          },
-        },
-      ];
+            content: '',
+            type: 'html',
+            status: 1
+          }
+        }
+      ]
     }
   } catch {
     /* 忽略 */
   }
-  return [];
+  return []
 }
 
 /** 解析 AI 页面 → BotItem */
 function parseBot(p: {
-  id: number;
-  name: string;
-  content: string | null;
-  type: string;
+  id: number
+  name: string
+  content: string | null
+  type: string
 }): BotItem | null {
-  if (p.type !== "html" || !p.content?.startsWith(AI_CHAT_MARKER)) return null;
+  if (p.type !== 'html' || !p.content?.startsWith(AI_CHAT_MARKER)) return null
   try {
-    const raw = JSON.parse(
-      p.content.slice(AI_CHAT_MARKER.length),
-    ) as AIChatConfig;
-    const config: AIChatConfig = { ...raw, apiKey: decodeKey(raw.apiKey) };
-    return { id: p.id, name: p.name, config, page: p as BotItem["page"] };
+    const raw = JSON.parse(p.content.slice(AI_CHAT_MARKER.length)) as AIChatConfig
+    const config: AIChatConfig = { ...raw, apiKey: decodeKey(raw.apiKey) }
+    return { id: p.id, name: p.name, config, page: p as BotItem['page'] }
   } catch {
-    return null;
+    return null
   }
 }
 
 export function AICenter() {
-  const { botId } = useParams<{ botId: string }>();
-  const navigate = useNavigate();
-  const { isAdmin } = useAuth();
-  const { settings } = useSite();
-  const [bots, setBots] = useState<BotItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { botId } = useParams<{ botId: string }>()
+  const navigate = useNavigate()
+  const { isAdmin } = useAuth()
+  const { settings } = useSite()
+  const [bots, setBots] = useState<BotItem[]>([])
+  const [loading, setLoading] = useState(true)
 
   const loadBots = useCallback(async () => {
     try {
-      const pages = await pageApi.list();
-      const items = pages.map(parseBot).filter((b): b is BotItem => !!b);
+      const pages = await pageApi.list()
+      const items = pages.map(parseBot).filter((b): b is BotItem => !!b)
       // 桌面端：后端不可用/无 AI 页面时回退本地模型配置
-      if (!items.length) items.push(...localBotFallback());
-      setBots(items);
+      if (!items.length) items.push(...localBotFallback())
+      setBots(items)
       // 写入 AI 机器人注册表（后台「AI 改写」选择）与首个配置缓存
       try {
         localStorage.setItem(
-          "kimo_ai_bots",
+          'kimo_ai_bots',
           JSON.stringify(
             items.map((b) => ({
               id: b.id,
               endpoint: b.config.endpoint,
               apiKey: b.config.apiKey,
-              model: b.config.model,
-            })),
-          ),
-        );
+              model: b.config.model
+            }))
+          )
+        )
         localStorage.setItem(
-          "kimo_ai_bot_config",
+          'kimo_ai_bot_config',
           JSON.stringify({
             endpoint: items[0]?.config.endpoint,
             apiKey: items[0]?.config.apiKey,
             model: items[0]?.config.model,
-            enabled: true,
-          }),
-        );
+            enabled: true
+          })
+        )
       } catch {
         /* 忽略 */
       }
     } catch {
       // 桌面端无后端：回退本地配置（仍可进入 AIChat 引导配置模型）
-      setBots(localBotFallback());
+      setBots(localBotFallback())
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [])
 
   useEffect(() => {
-    loadBots();
-  }, [loadBots]);
+    loadBots()
+  }, [loadBots])
 
-  const active = bots.find((b) => b.id === Number(botId)) || bots[0];
+  const active = bots.find((b) => b.id === Number(botId)) || bots[0]
 
-  const switchBot = useCallback(
-    (id: number) => navigate(`/ai/${id}`),
-    [navigate],
-  );
+  const switchBot = useCallback((id: number) => navigate(`/ai/${id}`), [navigate])
 
   if (loading) {
     return (
@@ -124,12 +119,10 @@ export function AICenter() {
             text="Think Different"
             className="text-xl font-medium tracking-[0.2em] text-gray-500 dark:text-gray-400"
           />
-          <p className="font-mono text-xs text-gray-300 dark:text-gray-600">
-            $ loading ...
-          </p>
+          <p className="font-mono text-xs text-gray-300 dark:text-gray-600">$ loading ...</p>
         </div>
       </div>
-    );
+    )
   }
 
   return (
@@ -143,9 +136,9 @@ export function AICenter() {
           bots={bots}
           onSwitchBot={switchBot}
           canManage={isAdmin}
-          onManage={() => navigate("/dashboard/ai")}
-          enableArticles={settings.enable_ai_articles === "1"}
-          enableCustomApi={settings.enable_custom_api !== "0"}
+          onManage={() => navigate('/dashboard/ai')}
+          enableArticles={settings.enable_ai_articles === '1'}
+          enableCustomApi={settings.enable_custom_api !== '0'}
         />
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-4 bg-white p-8 text-center dark:bg-gray-900">
@@ -170,5 +163,5 @@ export function AICenter() {
         </div>
       )}
     </>
-  );
+  )
 }
