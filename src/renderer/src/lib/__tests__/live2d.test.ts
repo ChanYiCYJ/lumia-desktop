@@ -80,7 +80,7 @@ describe("live2d · 反代 URL 构造", () => {
         { bundleName: "live2d/chara/001_casual", fileName: "model.moc.bytes" },
         "model",
       ),
-    ).toBe("/api/live2d/asset/jp/live2d/chara/001_casual_rip/model.moc");
+    ).toBe("lumia-live2d://asset/jp/live2d/chara/001_casual_rip/model.moc");
   });
 
   it("motion 去掉 motion/ 前缀与 .bytes（bestdori 真实 asset 无子目录）", () => {
@@ -92,19 +92,19 @@ describe("live2d · 反代 URL 构造", () => {
         },
         "motion",
       ),
-    ).toBe("/api/live2d/asset/jp/live2d/chara/001_general_rip/smile01.mtn");
+    ).toBe("lumia-live2d://asset/jp/live2d/chara/001_general_rip/smile01.mtn");
   });
 
   it("texture .bytes → .png、无扩展名补 .png、保留 .png", () => {
     const base = "live2d/chara/001_casual";
     expect(assetUrl({ bundleName: base, fileName: "t.bytes" }, "texture")).toBe(
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/t.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/t.png",
     );
     expect(assetUrl({ bundleName: base, fileName: "t2" }, "texture")).toBe(
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/t2.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/t2.png",
     );
     expect(assetUrl({ bundleName: base, fileName: "t3.png" }, "texture")).toBe(
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/t3.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/t3.png",
     );
   });
 
@@ -114,12 +114,12 @@ describe("live2d · 反代 URL 构造", () => {
         { bundleName: "live2d/chara/001_casual", fileName: "exp.exp.json" },
         "expression",
       ),
-    ).toBe("/api/live2d/asset/jp/live2d/chara/001_casual_rip/exp.exp.json");
+    ).toBe("lumia-live2d://asset/jp/live2d/chara/001_casual_rip/exp.exp.json");
   });
 
   it("buildDataUrl 指向反代入口", () => {
     expect(buildDataUrl("001_casual")).toBe(
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/buildData.asset",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/buildData.asset",
     );
   });
 });
@@ -131,9 +131,9 @@ describe("live2d · buildLive2dSettings", () => {
     expect(s.model).toContain("model.moc");
     expect(s.physics).toContain("physics.json");
     expect(s.textures).toEqual([
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/texture_00.png",
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/texture_01.png",
-      "/api/live2d/asset/jp/live2d/chara/001_casual_rip/texture_02.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/texture_00.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/texture_01.png",
+      "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/texture_02.png",
     ]);
   });
 
@@ -151,7 +151,7 @@ describe("live2d · buildLive2dSettings", () => {
     const s = buildLive2dSettings("001_casual", sampleBuildData);
     expect(s.expressions[0]).toEqual({
       name: "exp01",
-      file: "/api/live2d/asset/jp/live2d/chara/001_casual_rip/exp01.exp.json",
+      file: "lumia-live2d://asset/jp/live2d/chara/001_casual_rip/exp01.exp.json",
     });
   });
 });
@@ -478,16 +478,16 @@ describe("live2d · 第三方模型导入", () => {
 
   it("live2dProxyUrl 构造通用代理 URL", () => {
     expect(live2dProxyUrl("https://example.com/model/model.json")).toBe(
-      "/api/live2d/proxy?url=" +
+      "lumia-live2d://proxy?url=" +
         encodeURIComponent("https://example.com/model/model.json"),
     );
   });
 
   it("absoluteLive2dProxyUrl 含 origin（防 pixi 基于 model.json base 拼错主机）", () => {
     const u = absoluteLive2dProxyUrl("https://example.com/a.png");
-    expect(u).toContain("/api/live2d/proxy?url=");
+    expect(u).toContain("lumia-live2d://proxy?url=");
     expect(u).toContain(encodeURIComponent("https://example.com/a.png"));
-    expect(u.startsWith("http://") || u.startsWith("https://")).toBe(true);
+    expect(u.startsWith("lumia-live2d://proxy?url=")).toBe(true);
   });
 });
 
@@ -818,7 +818,7 @@ describe("live2d · Cubism3/4（.model3.json）加载链路", () => {
     );
     const url = "https://raw.example.com/models/Haru/Haru.model3.json";
     const s = await buildLive2dSettingsFromModel3(url);
-    expect(s.model).toContain("/api/live2d/proxy?url=");
+    expect(s.model).toContain("lumia-live2d://proxy?url=");
     expect(s.model).toContain(
       encodeURIComponent("https://raw.example.com/models/Haru/Haru.moc3"),
     );

@@ -4,7 +4,10 @@
  *   Token 放 `x-notion-token` 头（避免进 URL/日志），Worker 服务端转发到 api.notion.com。
  * - Token 存 localStorage（kimo_notion_cfg），与站点既有「密钥仅保存在当前浏览器」约定一致。
  * - 纯函数 + 可注入 fetch，便于 vitest 单测；未配置/网络失败时优雅降级为空（不阻塞对话）。
+ * - 桌面端：主进程直连（免 CORS，见 ./remote）。
  */
+
+import { isNative, notion } from "./remote";
 
 export interface NotionCfg {
   /** Notion Integration Token（secret_...） */
@@ -123,16 +126,41 @@ export async function notionRequest<T>(
   // 429 限流退避重试（并发请求后更易触发 Notion 速率限制；最多重试 2 次，指数退避）
   const MAX_RETRIES = 2;
   for (let attempt = 0; ; attempt++) {
-    const res = await f("/api/notion/" + path, init);
+    let res: { status: number; text: string };
+    // 桌面端：主进程直连 Notion（免 CORS）
+    if (isNative()) {
+      res = (await notion({
+        path,
+        method: opts.method,
+        body: opts.body,
+        token: opts.token,
+      })) as { status: number; text: string };
+    } else {
+      const r = await f("/api/notion/" + path, init);
+      // 兼容：真实 Response 用 text()；测试 mock 可能仅提供 json()
+      res =
+        typeof r.text === "function"
+          ? { status: r.status, text: await r.text() }
+          : {
+              status: (r.status as number) ?? 200,
+              text: JSON.stringify(await (r as { json?: () => Promise<unknown> }).json?.().catch(() => ({})) ?? {}),
+            };
+    }
     if (res.status === 429 && attempt < MAX_RETRIES) {
       await new Promise((r) => setTimeout(r, 400 * Math.pow(2, attempt)));
       continue;
     }
-    const j = (await res.json().catch(() => ({}))) as {
-      message?: unknown;
-      error?: unknown;
-    };
-    if (!res.ok) {
+    const j = (() => {
+      try {
+        return JSON.parse(res.text || "{}") as {
+          message?: unknown;
+          error?: unknown;
+        };
+      } catch {
+        return {};
+      }
+    })();
+    if (res.status >= 400) {
       const msg = j?.message || j?.error || `Notion 请求失败 (${res.status})`;
       throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     }

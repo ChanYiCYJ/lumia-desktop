@@ -11,6 +11,7 @@
  */
 
 import { resolveMaxTokens } from "./providerPresets";
+import { isNative, image } from "./remote";
 
 export interface ImageResult {
   title: string;
@@ -52,6 +53,15 @@ async function searchViaProxy(
   type: string,
   limit: number,
 ): Promise<ImageResult[]> {
+  // 桌面端：主进程本地图片引擎
+  if (isNative()) {
+    const j = (await image({
+      keyword: query,
+      category: type,
+      limit,
+    })) as { items?: ImageResult[] } | null;
+    return Array.isArray(j?.items) ? j.items : [];
+  }
   const j = await fetchImageJson(
     `/api/image/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}&limit=${limit}`,
     12000,

@@ -31,6 +31,7 @@ import { loadSearchSpeed } from "./chatSettings";
 import { Readability } from "@mozilla/readability";
 import { runSearchAgent } from "./searchAgent";
 import { resolveMaxTokens } from "./providerPresets";
+import { isNative, search, fetchPage } from "./remote";
 
 // ======================== 类型定义 ========================
 
@@ -278,23 +279,41 @@ export async function searchBackend(
     const tavilyOn = hasSearchApi(cfg) && cfg.provider === "tavily";
     const langs = lang === "en" || tavilyOn ? [lang] : [lang, "en"];
     const settled = await Promise.allSettled(
-      langs.map((l) => {
+      langs.map(async (l) => {
         const p = new URLSearchParams(params);
         p.set("lang", l);
-        return fetchWithTimeout(
+        // 桌面端：走主进程本地引擎（无 CORS、支持代理）
+        if (isNative()) {
+          const d = (await search({
+            query,
+            engines: p.get("engines") || undefined,
+            lang: l,
+            provider: cfg.provider || undefined,
+            apiKey: cfg.apiKey?.trim() || undefined,
+            instance: cfg.instance || undefined,
+            limit,
+            fast,
+          })) as { items?: SearchResult[] } | null;
+          return { ok: true, data: d };
+        }
+        const res = await fetchWithTimeout(
           `/api/search?${p.toString()}`,
           { headers: { Accept: "application/json" } },
           SEARCH_TIMEOUT_MS,
         );
+        const data = res.ok
+          ? ((await res.json().catch(() => null)) as
+              | { items?: SearchResult[] }
+              | SearchResult[]
+              | null)
+          : null;
+        return { ok: res.ok, data };
       }),
     );
     const items: SearchResult[] = [];
     for (const s of settled) {
       if (s.status !== "fulfilled" || !s.value.ok) continue;
-      const data = (await s.value.json().catch(() => null)) as
-        | { items?: SearchResult[] }
-        | SearchResult[]
-        | null;
+      const data = s.value.data;
       const arr = Array.isArray(data)
         ? data
         : Array.isArray(data?.items)
@@ -962,59 +981,114 @@ async function fetchWebContentInner(
   let finalUrl = u;
   let raw = "";
   let contentType = "text/plain";
+  let ct = "";
 
   try {
-    const res = await fetchWithTimeout(
-      `/api/fetch?url=${encodeURIComponent(u)}&maxChars=${maxChars}&raw=1`,
-      { headers: { Accept: "text/plain,application/json" } },
-      12000,
-    );
-    if (res.ok) {
-      const ct = res.headers.get("content-type") || "";
-      if (ct.includes("json")) {
-        const j = await res.json();
+    // 桌面端优先：主进程本地抓取（无 CORS、经代理）
+    if (isNative()) {
+      const j = (await fetchPage({
+        url: u,
+        maxChars,
+        raw: true,
+      })) as {
+        finalUrl?: string
+        contentType?: string
+        title?: string
+        ogImage?: string
+        images?: string[]
+        rawHtml?: string
+        content?: string
+        truncated?: boolean
+      } | null
+      if (j && (j.content || j.rawHtml)) {
         const base = {
           url: u,
-          finalUrl: (j && j.finalUrl) || u,
-          contentType: (j && j.contentType) || "text/html",
-          title: (j && j.title) || "",
-          ogImage: (j && j.ogImage) || "",
-          images: Array.isArray(j && j.images)
+          finalUrl: j.finalUrl || u,
+          contentType: j.contentType || "text/html",
+          title: j.title || "",
+          ogImage: j.ogImage || "",
+          images: Array.isArray(j.images)
             ? j.images.filter(
-                (im: string) =>
-                  /^https?:\/\//i.test(im) && !im.includes("data:"),
+                (im: string) => /^https?:\/\//i.test(im) && !im.includes("data:")
               )
             : [],
           retrievalMethod: "proxy" as const,
-        };
-        // readability 优先：浏览器端提取干净正文（无导航/页脚噪音）
-        if (j && typeof j.rawHtml === "string") {
-          const readContent = extractReadable(j.rawHtml);
+        }
+        if (typeof j.rawHtml === "string") {
+          const readContent = extractReadable(j.rawHtml)
           if (readContent) {
-            const truncated = readContent.length > maxChars;
+            const truncated = readContent.length > maxChars
             return {
               ...base,
               truncated,
               content: truncated
                 ? readContent.slice(0, maxChars) +
                   `\n\n[...truncated ${readContent.length - maxChars} characters]`
-                : readContent,
-            };
+                : readContent
+            }
           }
         }
-        if (j && j.content) {
+        if (j.content) {
           return {
             ...base,
             truncated: j.truncated || false,
-            content: normalizeText(j.content),
-          };
+            content: normalizeText(j.content)
+          }
         }
       }
-      raw = await res.text();
-      if (raw && raw.trim().length > 40) {
-        contentType = ct || "text/plain";
-        retrievalMethod = "proxy";
+    } else {
+      const res = await fetchWithTimeout(
+        `/api/fetch?url=${encodeURIComponent(u)}&maxChars=${maxChars}&raw=1`,
+        { headers: { Accept: "text/plain,application/json" } },
+        12000,
+      );
+      if (res.ok) {
+        ct = res.headers.get("content-type") || "";
+        if (ct.includes("json")) {
+          const j = await res.json();
+          const base = {
+            url: u,
+            finalUrl: (j && j.finalUrl) || u,
+            contentType: (j && j.contentType) || "text/html",
+            title: (j && j.title) || "",
+            ogImage: (j && j.ogImage) || "",
+            images: Array.isArray(j && j.images)
+              ? j.images.filter(
+                  (im: string) =>
+                    /^https?:\/\//i.test(im) && !im.includes("data:"),
+                )
+              : [],
+            retrievalMethod: "proxy" as const,
+          };
+          // readability 优先：浏览器端提取干净正文（无导航/页脚噪音）
+          if (j && typeof j.rawHtml === "string") {
+            const readContent = extractReadable(j.rawHtml);
+            if (readContent) {
+              const truncated = readContent.length > maxChars;
+              return {
+                ...base,
+                truncated,
+                content: truncated
+                  ? readContent.slice(0, maxChars) +
+                    `\n\n[...truncated ${readContent.length - maxChars} characters]`
+                  : readContent,
+              };
+            }
+          }
+          if (j && j.content) {
+            return {
+              ...base,
+              truncated: j.truncated || false,
+              content: normalizeText(j.content),
+            };
+          }
+        }
+        raw = await res.text();
       }
+    }
+    if (raw && raw.trim().length > 40) {
+      contentType = ct || "text/plain";
+      retrievalMethod = "proxy";
     }
   } catch {
     /* 代理不可用，回退直连 */
@@ -1195,19 +1269,27 @@ export async function webSearchWithContent(
 
 // ======================== AI 生成 markdown 文章（综合筛选） ========================
 
-/** 从网页提取 og:image 封面图（优先经 Worker 代理，解决 CORS） */
+/** 从网页提取 og:image 封面图（优先经本地/Worker 代理，解决 CORS） */
 async function extractOgImage(url: string): Promise<string> {
   try {
-    const res = await fetchWithTimeout(
-      `/api/fetch?url=${encodeURIComponent(url)}&maxChars=5000`,
-      { headers: { Accept: "application/json" } },
-      8000,
-    );
-    if (res.ok) {
-      const j = (await res.json().catch(() => null)) as {
-        ogImage?: string;
-      } | null;
+    if (isNative()) {
+      const j = (await fetchPage({
+        url,
+        maxChars: 5000,
+      })) as { ogImage?: string } | null;
       if (j?.ogImage) return j.ogImage;
+    } else {
+      const res = await fetchWithTimeout(
+        `/api/fetch?url=${encodeURIComponent(url)}&maxChars=5000`,
+        { headers: { Accept: "application/json" } },
+        8000,
+      );
+      if (res.ok) {
+        const j = (await res.json().catch(() => null)) as {
+          ogImage?: string;
+        } | null;
+        if (j?.ogImage) return j.ogImage;
+      }
     }
   } catch {
     /* 代理不可用，回退直连 */

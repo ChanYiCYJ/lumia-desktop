@@ -141,6 +141,7 @@ import {
   subscribe,
 } from "../lib/live2dCore";
 import { cleanTtsText, getTtsAudio } from "../lib/ttsCache";
+import { isNative, tts as nativeTts } from "../lib/remote";
 import {
   buildLorePrompt,
   loadLore,
@@ -2332,6 +2333,26 @@ export function AIChat({
       const thirdPartyUrl = loadTtsAudioUrl();
       // 音频 TTS（真实波形驱动口型）：按来源解析 URL
       const url = resolveTtsAudioUrl(ttsSource, thirdPartyUrl, ttsVoice, clean);
+      // 桌面端：未配置第三方音频地址时由主进程 msedge-tts 本地合成（无后端依赖）
+      if (isNative() && !thirdPartyUrl) {
+        const token = ++ttsPlayRef.current;
+        const onEnd = () => {
+          stopSpeaking();
+          setSpeakingIdx(-1);
+        };
+        nativeTts({ text: clean, voice: ttsVoice })
+          .then((r) => {
+            if (token !== ttsPlayRef.current) return;
+            if (r.ok && r.url) {
+              speakAudio(r.url, { volume: vol, onEnd });
+            } else {
+              toast(r.error || "本地语音合成失败", "error");
+              setSpeakingIdx(-1);
+            }
+          })
+          .catch(() => setSpeakingIdx(-1));
+        return;
+      }
       if (!url) {
         toast("请先配置音频 TTS 地址", "error");
         setSpeakingIdx(-1);

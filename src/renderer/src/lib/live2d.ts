@@ -190,12 +190,12 @@ export function assetUrl(
       fileName = fileName.replace(/\.bytes$/, ".png");
     else if (!fileName.includes(".")) fileName = `${fileName}.png`;
   }
-  return `/api/live2d/asset/jp/${file.bundleName}_rip/${fileName}`;
+  return `lumia-live2d://asset/jp/${file.bundleName}_rip/${fileName}`;
 }
 
 /** buildData.asset 的同源反代 URL */
 export function buildDataUrl(modelName: string): string {
-  return `/api/live2d/asset/jp/live2d/chara/${modelName}_rip/buildData.asset`;
+  return `lumia-live2d://asset/jp/live2d/chara/${modelName}_rip/buildData.asset`;
 }
 
 /** 拉取 buildData.asset 并返回 .Base */
@@ -258,22 +258,18 @@ export function isThirdPartyModelInput(v: string): boolean {
   return /^https?:\/\//i.test(s) || /\.json$/i.test(s) || s.includes("/");
 }
 
-/** 经 worker 通用代理拉取任意 URL（第三方资源无 CORS 头时必需） */
+/** 经主进程代理拉取任意 URL（第三方资源无 CORS 头时必需；桌面端为自定义协议） */
 export function live2dProxyUrl(target: string): string {
-  return "/api/live2d/proxy?url=" + encodeURIComponent(target);
+  return "lumia-live2d://proxy?url=" + encodeURIComponent(target);
 }
 
 /**
- * 第三方模型资源用的绝对代理 URL（含 origin）。
+ * 第三方模型资源用的绝对代理 URL。
  * pixi-live2d-display 会用 settings.url（model.json 的 base）解析资源相对路径，
  * 若返回相对路径会被拼到第三方主机（如 raw.githubusercontent.com）上导致 404 —— 必须绝对。
  */
 export function absoluteLive2dProxyUrl(target: string): string {
-  const origin =
-    typeof window !== "undefined" && window.location
-      ? window.location.origin
-      : "";
-  return origin + "/api/live2d/proxy?url=" + encodeURIComponent(target);
+  return "lumia-live2d://proxy?url=" + encodeURIComponent(target);
 }
 
 /** 拉取第三方 Cubism2 model.json 并构造 pixi-live2d-display settings（相对路径按 model.json 所在目录解析） */
@@ -1170,7 +1166,7 @@ export function resolveLive2dConfig(settings: SiteSettings): {
 
 export async function fetchAssetsIndex(): Promise<unknown> {
   const res = await fetch(
-    `/api/live2d/api/explorer/jp/assets/_info.json?_=${Date.now()}`,
+    `lumia-live2d://api/explorer/jp/assets/_info.json?_=${Date.now()}`,
   );
   if (!res.ok) throw new Error(`assets index HTTP ${res.status}`);
   return res.json();
@@ -1178,7 +1174,7 @@ export async function fetchAssetsIndex(): Promise<unknown> {
 
 export async function fetchCharacters(): Promise<unknown> {
   const res = await fetch(
-    `/api/live2d/api/characters/all.2.json?_=${Date.now()}`,
+    `lumia-live2d://api/characters/all.2.json?_=${Date.now()}`,
   );
   if (!res.ok) throw new Error(`characters HTTP ${res.status}`);
   return res.json();
