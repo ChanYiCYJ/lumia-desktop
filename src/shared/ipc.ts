@@ -17,6 +17,8 @@ export const IPC = {
   Secrets_Get: 'lumia:secrets:get',
   Secrets_Set: 'lumia:secrets:set',
   Secrets_Delete: 'lumia:secrets:delete',
+  Secrets_EncryptSync: 'lumia:secrets:encrypt-sync',
+  Secrets_DecryptSync: 'lumia:secrets:decrypt-sync',
   Agent_Search: 'lumia:agent:search',
   Agent_Fetch: 'lumia:agent:fetch',
   Agent_Image: 'lumia:agent:image',

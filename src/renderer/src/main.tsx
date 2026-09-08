@@ -3,8 +3,13 @@ import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "./lib/theme";
 import { aiChat } from "./lib/ai";
 import { getCachedLandingRoute } from "./lib/site";
+import { enableSecureStorage, migrateLocalSecrets } from "./lib/secureStorage";
 import "./index.css";
 import App from "./App";
+
+// 桌面端：API Key/Token 透明加密（safeStorage），先注入再迁移
+enableSecureStorage();
+migrateLocalSecrets();
 
 // 暴露给自定义 HTML 页面的全局 AI 接口
 (window as unknown as Record<string, unknown>).kimoAI = {

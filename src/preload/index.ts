@@ -29,6 +29,11 @@ const api = {
     ipcRenderer.invoke(IPC.Secrets_Set, key, value),
   secretsDelete: (key: string): Promise<void> =>
     ipcRenderer.invoke(IPC.Secrets_Delete, key),
+  /** 同步加解密（localStorage 透明加密层用；仅处理小字符串） */
+  secretEncryptSync: (value: string): string =>
+    ipcRenderer.sendSync(IPC.Secrets_EncryptSync, value),
+  secretDecryptSync: (value: string): string =>
+    ipcRenderer.sendSync(IPC.Secrets_DecryptSync, value),
 
   /** 网络层（P3 本地引擎 / 远程代理） */
   agentSearch: (req: unknown): Promise<unknown> =>

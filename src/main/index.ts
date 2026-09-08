@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { createMainWindow, registerWindowIpc } from './core/window'
 import { storageGet, storageSet, storageDelete, storageKeys } from './core/store'
 import { secretsGet, secretsSet, secretsDelete } from './secrets'
+import { safeStorageEncrypt, safeStorageDecrypt } from './secrets'
 import { registerAgentIpc } from './agent/index'
 import { registerLumiaProtocols } from './protocol'
 import { IPC, type AppInfo } from '../shared/ipc'
@@ -57,6 +58,14 @@ if (!app.requestSingleInstanceLock()) {
       secretsSet(key, value)
     )
     ipcMain.handle(IPC.Secrets_Delete, (_e, key: string) => secretsDelete(key))
+
+    // 同步加解密（renderer localStorage 透明加密层）
+    ipcMain.on(IPC.Secrets_EncryptSync, (event, value: string) => {
+      event.returnValue = safeStorageEncrypt(value)
+    })
+    ipcMain.on(IPC.Secrets_DecryptSync, (event, value: string) => {
+      event.returnValue = safeStorageDecrypt(value)
+    })
 
     // 文件对话框（导入/导出）
     ipcMain.handle(

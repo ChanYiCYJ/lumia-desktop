@@ -27,3 +27,23 @@ export function secretsGet(key: string): string | null {
 export function secretsDelete(key: string): void {
   storageDelete(`${PREFIX}${key}`)
 }
+
+/** 同步加密（safeStorage 不可用时返回原文） */
+export function safeStorageEncrypt(value: string): string {
+  if (!safeStorage.isEncryptionAvailable()) return value
+  try {
+    return safeStorage.encryptString(value).toString('base64')
+  } catch {
+    return value
+  }
+}
+
+/** 同步解密（非密文原样返回，兼容旧数据） */
+export function safeStorageDecrypt(value: string): string {
+  if (!safeStorage.isEncryptionAvailable()) return value
+  try {
+    return safeStorage.decryptString(Buffer.from(value, 'base64'))
+  } catch {
+    return value
+  }
+}
