@@ -19,16 +19,9 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install dependencies
-        env:
-          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-          npm_config_registry: https://registry.npmmirror.com
-          npm_config_ignore_scripts: 'false'
-        run: |
-          npm config set ignore-scripts false
-          npm ci --no-audit --no-fund
+        # GitHub Actions 在美国：用官方 registry + GitHub Electron 下载（最快），无需国内镜像
+        run: npm ci --no-audit --no-fund
       - name: Build & package (AppImage + deb)
-        env:
-          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run build:linux
       - uses: actions/upload-artifact@v4
         with:
@@ -47,15 +40,8 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install dependencies
-        env:
-          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
-          npm_config_registry: https://registry.npmmirror.com
-        run: |
-          npm config set ignore-scripts false
-          npm ci --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Build & package (NSIS)
-        env:
-          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
         run: npm run build:win
       - uses: actions/upload-artifact@v4
         with:
