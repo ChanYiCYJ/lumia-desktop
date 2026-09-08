@@ -1,0 +1,1304 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --card-radius: 1rem;
+  --max-article-width: 72ch;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+/* 隐藏滚动条（聊天输入框等） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 内容淡入（AI 对话消息等，配合 animate-[kfade_...] 使用） */
+@keyframes kfade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Agent面板从底部滑入 */
+@keyframes kslideUp {
+  from {
+    transform: translateY(40%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 下拉/浮层平滑弹出（缩放 + 淡入） */
+@keyframes kpop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Live2D 加载占位呼吸（柔和缩放脉冲） */
+@keyframes kbreathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.07);
+  }
+}
+
+/* Editor 移动端适配 */
+@media (max-width: 768px) {
+  .lobe-editor [contenteditable] {
+    touch-action: pan-y !important;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Kimo 风格编辑器 */
+.lobe-editor {
+  border-radius: 1rem !important;
+}
+.dark .lobe-editor {
+  background-color: rgb(17 24 39) !important;
+  color: rgb(209 213 219) !important;
+}
+
+body {
+  font-family: "Noto Serif SC", "SimSun", "宋体", serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #1f2937;
+  background-color: #f3f4f6;
+}
+
+/* ===== 暗色模式 ===== */
+.dark body {
+  color: #d1d5db;
+  background-color: #111827;
+}
+
+.dark .bg-fixed-cover {
+  background-color: #0f172a;
+}
+
+.dark .bg-blur-overlay {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+/* ===== 暗色模式 — 全局文字色 ===== */
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: #f3f4f6;
+}
+.dark .text-gray-700,
+.dark .text-gray-600 {
+  color: #d1d5db;
+}
+.dark .text-gray-500 {
+  color: #9ca3af;
+}
+.dark .text-gray-400 {
+  color: #6b7280;
+}
+.dark .text-gray-300 {
+  color: #4b5563;
+}
+
+/* 暗色 — 背景色：交由 Tailwind dark: 变体接管（移除全局覆盖，避免 bg-white 覆盖 dark:bg-* 选中态） */
+
+/* 暗色 — 边框 */
+.dark .border-gray-100 {
+  border-color: #1f2937;
+}
+.dark .border-gray-200 {
+  border-color: #374151;
+}
+.dark .border-gray-300 {
+  border-color: #4b5563;
+}
+
+/* 暗色 — 输入框 / 选择框 */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark select {
+  background-color: #1f2937;
+  color: #e5e7eb;
+  border-color: #374151;
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #6b7280;
+}
+
+/* 暗色 — hover 背景 */
+.dark .hover\:bg-gray-50:hover {
+  background-color: #1f2937;
+}
+.dark .hover\:bg-gray-100:hover {
+  background-color: #374151;
+}
+
+/* 暗色 — 分隔线 */
+.dark .border-t {
+  border-top-color: #374151;
+}
+.dark .border-b {
+  border-bottom-color: #374151;
+}
+.dark .border-l {
+  border-left-color: #374151;
+}
+.dark .border-r {
+  border-right-color: #374151;
+}
+
+/* 暗色 — 标签徽标 */
+.dark .pill-primary {
+  color: #d1d5db;
+  background: rgba(156, 163, 175, 0.15);
+  border-color: rgba(156, 163, 175, 0.3);
+}
+
+.dark .card {
+  background: rgba(31, 41, 55, 0.85);
+  border-color: rgba(55, 65, 81, 0.6);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 4px 16px -8px rgba(0, 0, 0, 0.3);
+}
+
+.dark .card-hover:hover {
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.3),
+    0 16px 32px -12px rgba(0, 0, 0, 0.4);
+  border-color: #4b5563;
+}
+
+/* ===== 背景（原项目：Bing 背景图 + 白色模糊遮罩） ===== */
+.bg-fixed-cover {
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+  background-size: cover;
+  background-position: center;
+  /* 图片加载失败时回退到中性底色 */
+  background-color: #f3f4f6;
+  background-image: url("https://api.1314.cool/bingimg");
+}
+
+.bg-blur-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  background: rgba(255, 255, 255, 0.66);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* ===== 卡片（原项目：bg-white/80 backdrop-blur rounded-3xl shadow-sm） ===== */
+.card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(243, 244, 246, 1);
+  border-radius: var(--card-radius);
+  box-shadow:
+    0 1px 2px rgba(16, 24, 40, 0.04),
+    0 4px 16px -8px rgba(16, 24, 40, 0.06);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 6px rgba(16, 24, 40, 0.05),
+    0 16px 32px -12px rgba(16, 24, 40, 0.12);
+  border-color: #e5e7eb;
+}
+
+/* ===== 分类 / 标签 徽标（原项目：text-primary bg-primary/10 rounded-full） ===== */
+.pill-primary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #374151;
+  background: rgba(107, 114, 128, 0.1);
+  border: 1px solid rgba(107, 114, 128, 0.22);
+  border-radius: 9999px;
+}
+
+/* ===== Markdown 正文（原项目：article-body 18px / 行高 1.9） ===== */
+.markdown-body {
+  font-size: 18px;
+  line-height: 1.9;
+  color: #1f2937;
+  word-wrap: break-word;
+}
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 1.6em 0 0.8em;
+  color: #111827;
+  scroll-margin-top: 5rem;
+}
+.markdown-body h1 {
+  font-size: 1.7em;
+  padding-bottom: 0.4em;
+  border-bottom: 1px solid #e5e7eb;
+}
+.markdown-body h2 {
+  font-size: 1.4em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid #eef0f2;
+}
+.markdown-body h3 {
+  font-size: 1.2em;
+}
+.markdown-body h4 {
+  font-size: 1.05em;
+}
+.markdown-body p {
+  margin: 1em 0;
+}
+.markdown-body a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.25);
+  transition: border-color 0.15s ease;
+}
+.markdown-body a:hover {
+  border-bottom-color: #2563eb;
+}
+.markdown-body strong {
+  font-weight: 700;
+  color: #111827;
+}
+.markdown-body blockquote {
+  margin: 1.2em 0;
+  padding: 0.5em 1.2em;
+  border-left: 4px solid #d1d5db;
+  background: rgba(243, 244, 246, 0.6);
+  border-radius: 0 0.75rem 0.75rem 0;
+  color: #4b5563;
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 1em 0;
+  padding-left: 1.6em;
+}
+.markdown-body ul {
+  list-style: disc;
+}
+.markdown-body ol {
+  list-style: decimal;
+}
+.markdown-body li {
+  margin: 0.35em 0;
+}
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: 0.3em 0;
+}
+.markdown-body code {
+  background: #f3f4f6;
+  color: #be185d;
+  padding: 0.15em 0.4em;
+  border-radius: 0.35rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+.markdown-body pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 1.1em 1.3em;
+  border-radius: 1rem;
+  overflow-x: auto;
+  margin: 1.3em 0;
+  line-height: 1.7;
+  font-size: 0.9em;
+}
+.markdown-body pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.markdown-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.3em 0;
+  font-size: 0.95em;
+}
+.markdown-body th,
+.markdown-body td {
+  border: 1px solid #e5e7eb;
+  padding: 0.55em 0.9em;
+  text-align: left;
+}
+.markdown-body th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.markdown-body tr:nth-child(2n) td {
+  background: #fcfcfd;
+}
+.markdown-body img {
+  max-width: 100%;
+  border-radius: 1rem;
+  margin: 1.2em auto;
+  box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08);
+  cursor: zoom-in;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.markdown-body img:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(16, 24, 40, 0.1);
+}
+.markdown-body hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+.markdown-body input[type="checkbox"] {
+  margin-right: 0.5em;
+}
+
+/* ===== 面板内综合文章（Kimo×Shiro：缩小适配侧栏） ===== */
+.markdown-body.kimo-panel {
+  font-size: 15px;
+  line-height: 1.75;
+}
+.markdown-body.kimo-panel h1 {
+  font-size: 1.45em;
+}
+.markdown-body.kimo-panel h2 {
+  font-size: 1.22em;
+}
+.markdown-body.kimo-panel h3 {
+  font-size: 1.08em;
+}
+.markdown-body.kimo-panel p {
+  margin: 0.7em 0;
+}
+
+/* ===== 浏览页站点加载进度条动画 ===== */
+@keyframes kload {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+/* ===== 代码高亮 ===== */
+.hljs {
+  background: transparent;
+  color: #e2e8f0;
+}
+
+/* ===== AI 对话消息内 Markdown（紧凑版） ===== */
+.chat-md {
+  line-height: 1.7;
+  word-wrap: break-word;
+}
+.chat-md > *:first-child {
+  margin-top: 0;
+}
+.chat-md > *:last-child {
+  margin-bottom: 0;
+}
+.chat-md p {
+  margin: 0.5em 0;
+}
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4 {
+  font-weight: 600;
+  margin: 0.8em 0 0.4em;
+  color: #111827;
+}
+.chat-md h1 {
+  font-size: 1.25em;
+}
+.chat-md h2 {
+  font-size: 1.15em;
+}
+.chat-md h3 {
+  font-size: 1.05em;
+}
+.chat-md ul,
+.chat-md ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+.chat-md li {
+  margin: 0.2em 0;
+}
+.chat-md a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.25);
+}
+.chat-md strong {
+  font-weight: 700;
+  color: #111827;
+}
+.chat-md code {
+  background: #f3f4f6;
+  color: #be185d;
+  padding: 0.1em 0.35em;
+  border-radius: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.chat-md pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 0.8em 1em;
+  border-radius: 0.75rem;
+  overflow-x: auto;
+  margin: 0.6em 0;
+  font-size: 0.85em;
+  line-height: 1.6;
+}
+.chat-md pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+}
+.chat-md blockquote {
+  margin: 0.6em 0;
+  padding: 0.4em 0.8em;
+  border-left: 3px solid #d1d5db;
+  background: rgba(243, 244, 246, 0.6);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: #4b5563;
+}
+.chat-md table {
+  border-collapse: collapse;
+  margin: 0.6em 0;
+  font-size: 0.9em;
+  width: 100%;
+}
+.chat-md th,
+.chat-md td {
+  border: 1px solid #e5e7eb;
+  padding: 0.4em 0.7em;
+  text-align: left;
+}
+.chat-md th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.chat-md hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 1em 0;
+}
+
+.dark .chat-md h1,
+.dark .chat-md h2,
+.dark .chat-md h3,
+.dark .chat-md h4 {
+  color: #f3f4f6;
+}
+.dark .chat-md strong {
+  color: #f3f4f6;
+}
+.dark .chat-md code {
+  background: #1f2937;
+  color: #f472b6;
+}
+.dark .chat-md th,
+.dark .chat-md td {
+  border-color: #374151;
+}
+.dark .chat-md th {
+  background: #1f2937;
+}
+.dark .chat-md blockquote {
+  border-left-color: #4b5563;
+  background: rgba(31, 41, 55, 0.5);
+  color: #9ca3af;
+}
+.dark .chat-md hr {
+  border-top-color: #374151;
+}
+
+/* ===== 知识融合：<details> 折叠块 + callout 引用块 ===== */
+.chat-md details.chat-details,
+.chat-md > details.chat-details {
+  margin: 0.6em 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  background: #f9fafb;
+  overflow: hidden;
+}
+.chat-md details.chat-details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 0.5em 0.9em;
+  font-size: 0.9em;
+  font-weight: 600;
+  color: #374151;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+}
+.chat-md details.chat-details > summary::-webkit-details-marker {
+  display: none;
+}
+.chat-md details.chat-details > summary::before {
+  content: "▸";
+  display: inline-block;
+  color: #9ca3af;
+  font-size: 0.85em;
+  transition: transform 0.15s ease;
+}
+.chat-md details.chat-details[open] > summary::before {
+  transform: rotate(90deg);
+}
+.chat-md details.chat-details .chat-details-body {
+  border-top: 1px solid #e5e7eb;
+  padding: 0.5em 0.9em 0.7em;
+  font-size: 0.9em;
+}
+/* callout：💡 等标记开头的引用块 → 彩色左边条（Notion 风格） */
+.chat-md blockquote.callout {
+  border-left-width: 4px;
+  border-left-color: #f59e0b;
+  background: rgba(254, 243, 199, 0.5);
+  color: #78350f;
+}
+.dark .chat-md blockquote.callout {
+  border-left-color: #f59e0b;
+  background: rgba(69, 26, 3, 0.35);
+  color: #fde68a;
+}
+.dark .chat-md details.chat-details {
+  border-color: #374151;
+  background: #111827;
+}
+.dark .chat-md details.chat-details > summary {
+  color: #d1d5db;
+}
+.dark .chat-md details.chat-details > summary::before {
+  color: #6b7280;
+}
+.dark .chat-md details.chat-details .chat-details-body {
+  border-top-color: #374151;
+}
+
+/* ===== 动画 ===== */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.fade-up {
+  animation: fadeUp 0.35s ease both;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.toast-in {
+  animation: toastIn 0.25s ease both;
+}
+
+@keyframes modalIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.modal-in {
+  animation: modalIn 0.2s ease both;
+}
+
+/* ===== 滚动条 ===== */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* ===== 暗色模式 — Markdown 正文 ===== */
+.dark .markdown-body {
+  color: #d1d5db;
+}
+.dark .markdown-body h1,
+.dark .markdown-body h2,
+.dark .markdown-body h3,
+.dark .markdown-body h4,
+.dark .markdown-body h5,
+.dark .markdown-body h6 {
+  color: #f3f4f6;
+}
+.dark .markdown-body h1 {
+  border-bottom-color: #374151;
+}
+.dark .markdown-body h2 {
+  border-bottom-color: #1f2937;
+}
+.dark .markdown-body a {
+  color: #60a5fa;
+  border-bottom-color: rgba(96, 165, 250, 0.25);
+}
+.dark .markdown-body strong {
+  color: #f3f4f6;
+}
+.dark .markdown-body blockquote {
+  border-left-color: #4b5563;
+  background: rgba(31, 41, 55, 0.5);
+  color: #9ca3af;
+}
+.dark .markdown-body code {
+  background: #1f2937;
+  color: #f472b6;
+}
+.dark .markdown-body th,
+.dark .markdown-body td {
+  border-color: #374151;
+}
+.dark .markdown-body th {
+  background: #1f2937;
+}
+.dark .markdown-body tr:nth-child(2n) td {
+  background: #111827;
+}
+.dark .markdown-body hr {
+  border-top-color: #374151;
+}
+
+/* ===== 暗色模式 — 滚动条 ===== */
+.dark ::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* ===== Milkdown 编辑器（AI Chat agent 编辑器，@milkdown/react） ===== */
+/* 结构：编辑器区 > div[data-milkdown-root]（无类）> .milkdown 容器 > .ProseMirror
+   data-milkdown-root 需撑满父级，否则高度塌缩为内容高度 */
+[data-milkdown-root] {
+  height: 100%;
+}
+/* .milkdown 同时命中外层容器与 .ProseMirror 编辑区；外层负责滚动，编辑区撑满 */
+.milkdown {
+  height: 100%;
+  overflow-y: auto;
+  outline: none;
+  color: #1f2937;
+  font-size: 15px;
+  line-height: 1.8;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+.milkdown.ProseMirror {
+  height: auto;
+  min-height: 100%;
+  padding: 0.9rem 1.15rem 1.5rem;
+}
+.milkdown > *:first-child {
+  margin-top: 0;
+}
+.milkdown p {
+  margin: 0.6em 0;
+}
+.milkdown h1,
+.milkdown h2,
+.milkdown h3,
+.milkdown h4,
+.milkdown h5,
+.milkdown h6 {
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 1.3em 0 0.6em;
+  color: #111827;
+}
+.milkdown h1 {
+  font-size: 1.55em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid #e5e7eb;
+}
+.milkdown h2 {
+  font-size: 1.3em;
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid #eef0f2;
+}
+.milkdown h3 {
+  font-size: 1.12em;
+}
+.milkdown a {
+  color: #2563eb;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(37, 99, 235, 0.25);
+}
+.milkdown a:hover {
+  border-bottom-color: #2563eb;
+}
+.milkdown strong {
+  font-weight: 700;
+  color: #111827;
+}
+.milkdown blockquote {
+  margin: 1em 0;
+  padding: 0.4em 1.1em;
+  border-left: 4px solid #d1d5db;
+  background: rgba(243, 244, 246, 0.6);
+  border-radius: 0 0.75rem 0.75rem 0;
+  color: #4b5563;
+}
+.milkdown ul,
+.milkdown ol {
+  margin: 0.8em 0;
+  padding-left: 1.5em;
+}
+.milkdown ul {
+  list-style: disc;
+}
+.milkdown ol {
+  list-style: decimal;
+}
+.milkdown li {
+  margin: 0.25em 0;
+}
+.milkdown li > ul,
+.milkdown li > ol {
+  margin: 0.2em 0;
+}
+.milkdown code {
+  background: #f3f4f6;
+  color: #be185d;
+  padding: 0.12em 0.35em;
+  border-radius: 0.3rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+.milkdown pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 1em 1.2em;
+  border-radius: 0.9rem;
+  overflow-x: auto;
+  margin: 1.1em 0;
+  line-height: 1.7;
+  font-size: 0.88em;
+}
+.milkdown pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.milkdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.1em 0;
+  font-size: 0.93em;
+}
+.milkdown th,
+.milkdown td {
+  border: 1px solid #e5e7eb;
+  padding: 0.5em 0.85em;
+  text-align: left;
+}
+.milkdown th {
+  background: #f9fafb;
+  font-weight: 600;
+}
+.milkdown tr:nth-child(2n) td {
+  background: #fcfcfd;
+}
+.milkdown img {
+  max-width: 100%;
+  border-radius: 0.9rem;
+  margin: 1em auto;
+}
+.milkdown hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 1.6em 0;
+}
+.milkdown input[type="checkbox"] {
+  margin-right: 0.4em;
+}
+.milkdown .ProseMirror-selectednode {
+  outline: 2px solid rgba(37, 99, 235, 0.4);
+  outline-offset: 2px;
+}
+
+/* Milkdown 暗色模式 */
+.dark .milkdown {
+  color: #d1d5db;
+}
+.dark .milkdown h1,
+.dark .milkdown h2,
+.dark .milkdown h3,
+.dark .milkdown h4,
+.dark .milkdown h5,
+.dark .milkdown h6 {
+  color: #f3f4f6;
+}
+.dark .milkdown h1 {
+  border-bottom-color: #374151;
+}
+.dark .milkdown h2 {
+  border-bottom-color: #1f2937;
+}
+.dark .milkdown a {
+  color: #60a5fa;
+  border-bottom-color: rgba(96, 165, 250, 0.25);
+}
+.dark .milkdown strong {
+  color: #f3f4f6;
+}
+.dark .milkdown blockquote {
+  border-left-color: #4b5563;
+  background: rgba(31, 41, 55, 0.5);
+  color: #9ca3af;
+}
+.dark .milkdown code {
+  background: #1f2937;
+  color: #f472b6;
+}
+.dark .milkdown th,
+.dark .milkdown td {
+  border-color: #374151;
+}
+.dark .milkdown th {
+  background: #1f2937;
+}
+.dark .milkdown tr:nth-child(2n) td {
+  background: #111827;
+}
+.dark .milkdown hr {
+  border-top-color: #374151;
+}
+
+/* Milkdown 代码块 prism 高亮 token（深色 pre 内，与站点配色一致的柔和色板，避免紫色） */
+.milkdown pre .token.comment,
+.milkdown pre .token.prolog,
+.milkdown pre .token.doctype,
+.milkdown pre .token.cdata {
+  color: #94a3b8;
+}
+.milkdown pre .token.punctuation {
+  color: #cbd5e1;
+}
+.milkdown pre .token.property,
+.milkdown pre .token.tag,
+.milkdown pre .token.boolean,
+.milkdown pre .token.number,
+.milkdown pre .token.constant,
+.milkdown pre .token.symbol,
+.milkdown pre .token.deleted {
+  color: #f472b6;
+}
+.milkdown pre .token.selector,
+.milkdown pre .token.attr-name,
+.milkdown pre .token.string,
+.milkdown pre .token.char,
+.milkdown pre .token.builtin,
+.milkdown pre .token.inserted {
+  color: #86efac;
+}
+.milkdown pre .token.operator,
+.milkdown pre .token.entity,
+.milkdown pre .token.url,
+.milkdown pre .token.variable {
+  color: #93c5fd;
+}
+.milkdown pre .token.atrule,
+.milkdown pre .token.attr-value,
+.milkdown pre .token.keyword {
+  color: #7dd3fc;
+}
+.milkdown pre .token.function,
+.milkdown pre .token.class-name {
+  color: #fbbf24;
+}
+.milkdown pre .token.regex,
+.milkdown pre .token.important {
+  color: #fca5a5;
+}
+
+/* ===== 知识库块编辑器（BlockNote，Notion 式）适配 ===== */
+.kimo-block-editor {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+}
+.kimo-block-editor .bn-editor {
+  padding: 0.5rem 0.25rem 3rem;
+  color: #374151;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.dark .kimo-block-editor .bn-editor {
+  color: #d1d5db;
+}
+/* 标题字号与面板正文协调 */
+.kimo-block-editor .bn-editor h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+.kimo-block-editor .bn-editor h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+.kimo-block-editor .bn-editor h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+/* 空态占位与正文同色系、更淡 */
+.kimo-block-editor .bn-editor .bn-block-outer .bn-inline-content-placeholder {
+  color: #9ca3af;
+}
+.dark
+  .kimo-block-editor
+  .bn-editor
+  .bn-block-outer
+  .bn-inline-content-placeholder {
+  color: #6b7280;
+}
+/* 侧边菜单/拖拽手柄配色随暗色 */
+.dark .kimo-block-editor .bn-side-menu {
+  color: #9ca3af;
+}
+/* 隐藏 Mantine 默认对正文容器加的纵向内边距，交给 bn-editor */
+.kimo-block-editor .bn-container {
+  height: 100%;
+}
+
+/* ===== 知识库 Notion 式页面树 ===== */
+.kimo-kb-tree {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 0.25rem 0.5rem;
+}
+/* 顶部拖放条：拖到此处 = 移到顶层 */
+.kimo-kb-tree-top {
+  flex: none;
+  height: 18px;
+  margin: 0 0.25rem 0.25rem;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 18px;
+  text-align: center;
+  color: transparent;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    height 0.15s;
+}
+.kimo-kb-tree-top.dragging {
+  color: #9ca3af;
+}
+.kimo-kb-tree-top.active {
+  height: 26px;
+  color: #6366f1;
+  background: #eef2ff;
+  outline: 1px dashed #a5b4fc;
+}
+.dark .kimo-kb-tree-top.active {
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.15);
+}
+/* 行 */
+.kimo-kb-tree-row {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  border-radius: 8px;
+  padding-right: 6px;
+  color: #374151;
+  cursor: default;
+  transition: background 0.12s;
+}
+.kimo-kb-tree-row:hover {
+  background: #f3f4f6;
+}
+.dark .kimo-kb-tree-row {
+  color: #d1d5db;
+}
+.dark .kimo-kb-tree-row:hover {
+  background: #1f2937;
+}
+.kimo-kb-tree-row.active {
+  background: #eef2ff;
+  color: #4338ca;
+}
+.dark .kimo-kb-tree-row.active {
+  background: rgba(99, 102, 241, 0.18);
+  color: #c7d2fe;
+}
+/* 拖拽落点指示 */
+.kimo-kb-tree-row.drop-before {
+  box-shadow: inset 0 1.5px 0 0 #6366f1;
+}
+.kimo-kb-tree-row.drop-after {
+  box-shadow: inset 0 -1.5px 0 0 #6366f1;
+}
+.kimo-kb-tree-row.drop-child {
+  outline: 1.5px dashed #818cf8;
+  outline-offset: -2px;
+}
+.kimo-kb-tree-row.moving {
+  opacity: 0.55;
+}
+/* 抓柄（悬停显示） */
+.kimo-kb-tree-grip {
+  display: grid;
+  flex: none;
+  width: 16px;
+  height: 20px;
+  place-items: center;
+  color: #d1d5db;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.kimo-kb-tree-row:hover .kimo-kb-tree-grip {
+  opacity: 1;
+}
+.kimo-kb-tree-grip:active {
+  cursor: grabbing;
+}
+.dark .kimo-kb-tree-grip {
+  color: #6b7280;
+}
+/* 折叠箭头 */
+.kimo-kb-tree-chev {
+  display: grid;
+  flex: none;
+  width: 18px;
+  height: 22px;
+  place-items: center;
+  border-radius: 4px;
+  color: #9ca3af;
+}
+.kimo-kb-tree-chev button:hover {
+  background: #e5e7eb;
+}
+.kimo-kb-tree-chev svg {
+  display: block;
+}
+/* 名称 */
+.kimo-kb-tree-name {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+.kimo-kb-tree-name > svg {
+  flex: none;
+  color: #9ca3af;
+}
+.dark .kimo-kb-tree-name > svg {
+  color: #6b7280;
+}
+.kimo-kb-tree-moving {
+  margin-left: auto;
+  flex: none;
+  font-size: 10px;
+  color: #6366f1;
+}
+/* 内联重命名 */
+.kimo-kb-tree-rename {
+  min-width: 0;
+  flex: 1;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid #6366f1;
+  background: #fff;
+  padding: 0 6px;
+  font-size: 13px;
+  color: #111827;
+  outline: none;
+}
+.dark .kimo-kb-tree-rename {
+  background: #111827;
+  color: #f3f4f6;
+}
+/* 悬停工具栏 */
+.kimo-kb-tree-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.kimo-kb-tree-row:hover .kimo-kb-tree-actions {
+  opacity: 1;
+}
+.kimo-kb-tree-act {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 6px;
+  color: #9ca3af;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.kimo-kb-tree-act:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+.dark .kimo-kb-tree-act:hover {
+  background: #374151;
+  color: #e5e7eb;
+}
+/* ⋯ 菜单 */
+.kimo-kb-tree-menu {
+  position: absolute;
+  right: 6px;
+  top: calc(100% - 4px);
+  z-index: 40;
+  min-width: 128px;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.dark .kimo-kb-tree-menu {
+  border-color: #374151;
+  background: #111827;
+}
+.kimo-kb-tree-menu button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: #374151;
+  text-align: left;
+}
+.kimo-kb-tree-menu button:hover {
+  background: #f3f4f6;
+}
+.kimo-kb-tree-menu button.danger {
+  color: #ef4444;
+}
+.kimo-kb-tree-menu button.danger:hover {
+  background: #fef2f2;
+}
+.dark .kimo-kb-tree-menu button {
+  color: #d1d5db;
+}
+.dark .kimo-kb-tree-menu button:hover {
+  background: #1f2937;
+}
+.dark .kimo-kb-tree-menu button.danger {
+  color: #f87171;
+}
+.dark .kimo-kb-tree-menu button.danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+}
+/* 空态 */
+.kimo-kb-tree-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  font-size: 12px;
+  color: #9ca3af;
+  text-align: center;
+}
+.dark .kimo-kb-tree-empty {
+  color: #6b7280;
+}

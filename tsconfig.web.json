@@ -10,6 +10,9 @@
     "composite": true,
     "jsx": "react-jsx",
     "baseUrl": ".",
+    "types": ["node"],
+    // 与源项目 lumia-frontend 一致：信源组件中存在"部分分支无 return"的既有写法
+    "noImplicitReturns": false,
     "paths": {
       "@renderer/*": [
         "src/renderer/src/*"
