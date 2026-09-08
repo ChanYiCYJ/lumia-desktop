@@ -28,6 +28,8 @@ export function createMainWindow(icon?: string): BrowserWindow {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
+    // 无边框 + 自绘标题栏（renderer TitleBar 提供拖拽/控制按钮）
+    frame: false,
     backgroundColor: '#f5f5f7',
     ...(process.platform === 'linux' && icon ? { icon } : {}),
     webPreferences: {
