@@ -9,7 +9,7 @@
  *    必须给足否则 content 为空；Kimi moonshot-v1 默认 max_tokens=1024，长文易被截断）
  */
 
-export type AiProvider = "deepseek" | "kimi" | "openai" | "other";
+export type AiProvider = "deepseek" | "kimi" | "openai" | "ollama" | "lmstudio" | "other";
 
 export interface ProviderPreset {
   id: AiProvider;
@@ -77,6 +77,24 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     latest: ["gpt-4o-mini"],
     desc: "OpenAI 官方兼容接口",
   },
+  {
+    id: "ollama",
+    name: "Ollama",
+    endpoint: "http://127.0.0.1:11434/v1",
+    model: "qwen3:8b",
+    models: ["qwen3:8b", "qwen3:4b", "deepseek-r1:7b", "llama3.2:3b"],
+    latest: ["qwen3:8b"],
+    desc: "本机 Ollama（OpenAI 兼容 /v1），离线私有模型",
+  },
+  {
+    id: "lmstudio",
+    name: "LM Studio",
+    endpoint: "http://127.0.0.1:1234/v1",
+    model: "local-model",
+    models: ["local-model"],
+    latest: [],
+    desc: "本机 LM Studio（OpenAI 兼容 /v1），启动后自动加载模型",
+  },
 ];
 
 export function getPreset(id: AiProvider): ProviderPreset | undefined {
@@ -97,6 +115,10 @@ export function detectProvider(endpoint: string, model: string): AiProvider {
     return "kimi";
   if (e.includes("openai") || e.includes("openrouter") || m.includes("gpt"))
     return "openai";
+  if (e.includes("11434") || m.includes("qwen") || m.includes("ollama"))
+    return "ollama";
+  if (e.includes("1234") || m.includes("lmstudio") || m.includes("local-model"))
+    return "lmstudio";
   return "other";
 }
 

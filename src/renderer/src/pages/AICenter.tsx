@@ -4,8 +4,39 @@ import { pageApi } from "../lib/api";
 import { AI_CHAT_MARKER, decodeKey, type AIChatConfig } from "../lib/types";
 import { useAuth } from "../lib/auth";
 import { useSite } from "../lib/site";
+import { getAIConfig } from "../lib/ai";
 import { TypeWriter } from "../components/Spinner";
 import { AIChat, type BotItem } from "../components/AIChat";
+
+/** 桌面端本地回退：无后端时用本地模型配置（kimo_ai_bots / 自定义模型）构造 bot */
+function localBotFallback(): BotItem[] {
+  try {
+    const cfg = getAIConfig();
+    if (cfg.enabled && cfg.endpoint) {
+      const name = cfg.model || "Lumia 助手";
+      return [
+        {
+          id: 0,
+          name,
+          config: {
+            ...(cfg as unknown as AIChatConfig),
+            botName: name,
+          },
+          page: {
+            id: 0,
+            name,
+            content: "",
+            type: "html",
+            status: 1,
+          },
+        },
+      ];
+    }
+  } catch {
+    /* 忽略 */
+  }
+  return [];
+}
 
 /** 解析 AI 页面 → BotItem */
 function parseBot(p: {
@@ -38,6 +69,8 @@ export function AICenter() {
     try {
       const pages = await pageApi.list();
       const items = pages.map(parseBot).filter((b): b is BotItem => !!b);
+      // 桌面端：后端不可用/无 AI 页面时回退本地模型配置
+      if (!items.length) items.push(...localBotFallback());
       setBots(items);
       // 写入 AI 机器人注册表（后台「AI 改写」选择）与首个配置缓存
       try {
@@ -65,7 +98,8 @@ export function AICenter() {
         /* 忽略 */
       }
     } catch {
-      setBots([]);
+      // 桌面端无后端：回退本地配置（仍可进入 AIChat 引导配置模型）
+      setBots(localBotFallback());
     } finally {
       setLoading(false);
     }

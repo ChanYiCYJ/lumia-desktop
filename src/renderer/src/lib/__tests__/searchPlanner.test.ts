@@ -267,6 +267,23 @@ describe("searchPlanner · searchSegmented 编排", () => {
     expect(searchCalls.length).toBeGreaterThanOrEqual(r.subQueries.length);
   });
 
+  it("每个子查询真正被搜索（回归：不得复用整句 enriched）", async () => {
+    const urls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        urls.push(String(url));
+        return jsonResponse([]);
+      }),
+    );
+    const r = await searchSegmented("React 和 Vue 对比", { speed: "standard" });
+    const qs = urls
+      .filter((u) => u.includes("/api/search"))
+      .map((u) => new URL(u, "http://x").searchParams.get("q") || "");
+    // 至少有一个请求 q 精确命中某个子查询（修复前全部请求都是整句 enriched）
+    expect(qs.some((q) => r.subQueries.includes(q))).toBe(true);
+  });
+
   it("空结果走纠错 + AI 兜底", async () => {
     // searchAI 需要 AI 配置
     localStorage.setItem(

@@ -573,7 +573,8 @@ export async function searchSegmented(
         total: subs.length,
         subQuery: sq,
       });
-      const results = await searchFast(enriched, perSub);
+      // 修复：逐个子查询搜索（此前误传 enriched 整句 → 分段形同虚设）
+      const results = await searchFast(sq, perSub);
       return { sub: sq, results };
     }),
   );

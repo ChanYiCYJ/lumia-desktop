@@ -32,6 +32,7 @@ import { Readability } from "@mozilla/readability";
 import { runSearchAgent } from "./searchAgent";
 import { resolveMaxTokens } from "./providerPresets";
 import { isNative, search, fetchPage } from "./remote";
+import { getAIConfig } from "./ai";
 
 // ======================== 类型定义 ========================
 
@@ -218,22 +219,22 @@ function diversifyByDomain(
 
 function getAICfg() {
   try {
-    const bots = JSON.parse(localStorage.getItem("kimo_ai_bots") || "[]") as {
-      endpoint: string;
-      apiKey: string;
-      model: string;
-    }[];
-    if (bots.length) return bots[0];
-    const botCfg = JSON.parse(
-      localStorage.getItem("kimo_ai_bot_config") || "null",
-    );
-    if (botCfg?.endpoint) return botCfg;
+    // 本地自定义 API 优先（桌面本地模型/用户自配；与 AIChat mergeEffCfg 方向一致）
     for (const k of Object.keys(localStorage)) {
       if (!k.startsWith("kimo_ai_local_")) continue;
       const lc = JSON.parse(localStorage.getItem(k) || "null");
       if (lc?.endpoint && lc?.apiKey && lc?.model) {
         return { endpoint: lc.endpoint, apiKey: lc.apiKey, model: lc.model };
       }
+    }
+  } catch {
+    /* ignore */
+  }
+  // 与 ai.ts getAIConfig 对齐：AI 改写选中的机器人（非 bots[0]），再回退首个/旧配置
+  try {
+    const cfg = getAIConfig();
+    if (cfg.enabled && cfg.endpoint && cfg.apiKey && cfg.model) {
+      return { endpoint: cfg.endpoint, apiKey: cfg.apiKey, model: cfg.model };
     }
   } catch {
     /* ignore */
@@ -254,6 +255,7 @@ export async function searchBackend(
     if (hasSearchApi(cfg)) {
       params.set("provider", cfg.provider);
       if (cfg.provider === "tavily") params.set("apiKey", cfg.apiKey.trim());
+      if (cfg.provider === "brave") params.set("apiKey", cfg.apiKey.trim());
       if (cfg.provider === "searxng")
         params.set("instance", cfg.instance.trim());
     }

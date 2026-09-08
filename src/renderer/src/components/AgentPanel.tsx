@@ -230,6 +230,12 @@ export function AgentPanel({
   const [webError, setWebError] = useState("");
   /** 记录当前正在执行的浏览关键词，防止陈旧轮询覆盖新浏览 */
   const activeBrowseRef = useRef("");
+  /** 切 tab / 组件卸载时取消进行中的浏览轮询（避免后台空转写状态） */
+  useEffect(() => {
+    return () => {
+      activeBrowseRef.current = "";
+    };
+  }, [tab, pageId]);
   /** AI 综合筛选后生成的 markdown 文章（含图片/分节/来源） */
   const [articleMd, setArticleMd] = useState("");
   const [articleLoading, setArticleLoading] = useState(false);

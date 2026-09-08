@@ -8,7 +8,7 @@
  * - 被网络拦截/失败时一律优雅降级：不硬刚，走免费引擎（Wikipedia / Google News RSS / AI 兜底）
  */
 
-export type SearchApiProvider = "auto" | "tavily" | "searxng";
+export type SearchApiProvider = "auto" | "tavily" | "brave" | "searxng";
 
 /** 缓存时效（分钟）：15 分钟 / 1 小时 / 6 小时 */
 export type SearchApiTtl = 15 | 60 | 360;
@@ -33,7 +33,12 @@ export interface SearchApiTestResult {
 
 const KEY = "kimo_search_api_cfg";
 const VALID_TTL: SearchApiTtl[] = [15, 60, 360];
-const VALID_PROVIDERS: SearchApiProvider[] = ["auto", "tavily", "searxng"];
+const VALID_PROVIDERS: SearchApiProvider[] = [
+  "auto",
+  "tavily",
+  "brave",
+  "searxng",
+];
 
 /** 平台元信息（供设置 UI 展示） */
 export const SEARCH_API_PROVIDERS: {
@@ -54,6 +59,13 @@ export const SEARCH_API_PROVIDERS: {
     value: "tavily",
     label: "Tavily",
     desc: "免费 1000 次/月，支持当天新闻",
+    needKey: true,
+    needInstance: false,
+  },
+  {
+    value: "brave",
+    label: "Brave",
+    desc: "免费 2000 次/月，隐私搜索",
     needKey: true,
     needInstance: false,
   },
