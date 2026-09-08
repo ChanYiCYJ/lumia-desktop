@@ -5,6 +5,7 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { storageGet, storageSet } from './store'
+import { enableRendererDiag } from '../diag'
 
 const WINDOW_STATE_KEY = 'window-state'
 
@@ -65,6 +66,9 @@ export function createMainWindow(icon?: string): BrowserWindow {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  // 启动诊断：console/加载失败/进程崩溃/挂载探测 → <userData>/logs/boot.log
+  enableRendererDiag(win)
 
   return win
 }

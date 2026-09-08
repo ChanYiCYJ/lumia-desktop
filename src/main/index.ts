@@ -9,6 +9,7 @@ import { safeStorageEncrypt, safeStorageDecrypt } from './secrets'
 import { registerAgentIpc } from './agent/index'
 import { registerLumiaProtocols } from './protocol'
 import { applyGpuCompat, watchGpuCompat } from './gpu'
+import { logBoot } from './diag'
 import { IPC, type AppInfo } from '../shared/ipc'
 
 // Windows/远程桌面 GPU 白屏自愈：须在 app ready 前决定是否软渲
@@ -122,6 +123,10 @@ if (!app.requestSingleInstanceLock()) {
     registerIpc()
     registerAgentIpc()
     registerLumiaProtocols()
+
+    logBoot(
+      `[boot] platform=${process.platform} arch=${process.arch} electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node} argv=${JSON.stringify(process.argv.slice(1))}`
+    )
 
     // GPU 启动异常 → 自动软渲重启（须在窗口创建前挂监听）
     watchGpuCompat()

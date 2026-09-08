@@ -45,13 +45,17 @@ function loadCached(): SiteSettings {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as SiteSettings;
+    const parsed = JSON.parse(raw) as unknown;
+    // 容错：localStorage 里若被写入字面值 null（JSON.parse("null") → null），
+    // 后续 cached.route_map 会抛 TypeError → main.tsx 顶层崩溃 → 整页白屏
+    return parsed && typeof parsed === "object" ? (parsed as SiteSettings) : {};
   } catch {
     return {};
   }
 }
 
-function saveCache(s: SiteSettings) {
+function saveCache(s: SiteSettings | null | undefined) {
+  if (!s || typeof s !== "object") return; // 不写 null 进缓存
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(s));
   } catch {
@@ -106,8 +110,10 @@ export function SiteProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const s = await settingApi.all();
-      setSettings({ ...DEFAULT_SETTINGS, ...s });
-      saveCache(s);
+      if (s && typeof s === "object") {
+        setSettings({ ...DEFAULT_SETTINGS, ...s });
+        saveCache(s);
+      }
     } catch {
       /* 忽略，使用默认 */
     } finally {
