@@ -42,6 +42,8 @@ window.addEventListener('unhandledrejection', (e) => showBootError(e.reason))
 // 桌面端：API Key/Token 透明加密（safeStorage），先注入再迁移
 enableSecureStorage()
 migrateLocalSecrets()
+// 诊断：preload 桥是否生效（false → 安全存储/本地搜索/TTS/Live2D 均静默降级）
+console.log('[lumia] native bridge:', typeof window.api !== 'undefined' && !!window.api)
 
 // 暴露给自定义 HTML 页面的全局 AI 接口
 ;(window as unknown as Record<string, unknown>).kimoAI = {

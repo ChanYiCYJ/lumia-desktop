@@ -66,20 +66,22 @@ function probeRoot(wc: Electron.WebContents): void {
   const timer = setInterval(() => {
     tries += 1
     wc.executeJavaScript(
-      `(() => { const r = document.getElementById('root'); return { html: r ? r.innerHTML.length : -1, bodyText: (document.body.innerText || '').length, children: document.body ? document.body.children.length : -1 } })()`,
+      `(() => { const r = document.getElementById('root'); return { html: r ? r.innerHTML.length : -1, bodyText: (document.body.innerText || '').length, children: document.body ? document.body.children.length : -1, nativeApi: typeof window.api !== 'undefined' && !!window.api } })()`,
       true
     )
       .then((v) => {
-        const s = v as { html: number; bodyText: number; children: number }
+        const s = v as { html: number; bodyText: number; children: number; nativeApi: boolean }
         if (s.html > 0 || s.bodyText > 0 || tries > 12) {
           clearInterval(timer)
           logBoot(
             s.html > 0 || s.bodyText > 0
-              ? `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} → React 已挂载 ✅`
-              : `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} → 根节点仍为空（白屏！见上方 [renderer:*] 错误）`
+              ? `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → React 已挂载 ✅`
+              : `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → 根节点仍为空（白屏！见上方 [renderer:*] 错误）`
           )
         } else {
-          logBoot(`[probe] ${tries}/8 root.html=${s.html} bodyText=${s.bodyText}（等待挂载…）`)
+          logBoot(
+            `[probe] ${tries}/8 root.html=${s.html} bodyText=${s.bodyText} nativeApi=${s.nativeApi}（等待挂载…）`
+          )
         }
       })
       .catch((err) => {

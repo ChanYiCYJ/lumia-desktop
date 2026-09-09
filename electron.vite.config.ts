@@ -12,6 +12,14 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src')
       }
     },
-    plugins: [react(), tailwindcss()]
+    plugins: [react(), tailwindcss()],
+    // dev 代理（与 lumia-frontend vite.config.ts 一致）：
+    // 后端未启动时 /api 返回 502 → 前端按“网络错误”回退 mock，避免 404 被当成真实错误
+    server: {
+      proxy: {
+        '/api': { target: 'http://localhost:8000', changeOrigin: true },
+        '/static': { target: 'http://localhost:8000', changeOrigin: true }
+      }
+    }
   }
 })
