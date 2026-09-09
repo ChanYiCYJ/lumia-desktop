@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './lib/auth'
 import { SiteProvider } from './lib/site'
 import { ToastProvider } from './lib/toast'
@@ -49,9 +49,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 }
 
 // Lumia Desktop：仅保留 Agent 中心（/ai），其余一律重定向
+// 用 HashRouter（#/ai）：打包版从 file:// 加载，BrowserRouter 的 history API
+// 在 file:// + asar + Windows（Electron 39.8.x）下路由静默失效 → 界面只有顶栏、内容区空白。
+// HashRouter 不依赖 history API，dev/预览/打包/windows 行为一致。
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="flex h-screen flex-col overflow-hidden">
         <TitleBar />
         <div className="min-h-0 flex-1">
@@ -71,6 +74,6 @@ export default function App() {
           </AuthProvider>
         </div>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }

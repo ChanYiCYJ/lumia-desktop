@@ -57,11 +57,15 @@ console.log('[lumia] native bridge:', typeof window.api !== 'undefined' && !!win
 }
 
 // 落地页即时跳转：用本地缓存的 route_map/default_route 同步决定首页去向，
-// 在 React 挂载前改写 URL，避免每次访问都先显示"加载中"再重定向到落地页。
-// 首次访问（无缓存）时跳过，由 Layout 等待设置加载后正常跳转。
-const landingRoute = getCachedLandingRoute(window.location.hostname)
-if (landingRoute && landingRoute !== '/' && window.location.pathname === '/') {
-  window.history.replaceState(null, '', landingRoute)
+// 在 React 挂载前改写 URL（HashRouter 下改写 hash），避免每次访问都先显示"加载中"。
+// file:// 下 history API 不可靠（Windows 白屏根因之一），任何失败都不阻塞启动。
+try {
+  const landingRoute = getCachedLandingRoute(window.location.hostname)
+  if (landingRoute && landingRoute !== '/' && window.location.pathname === '/') {
+    window.history.replaceState(null, '', landingRoute)
+  }
+} catch {
+  /* 忽略：file:// 受限时走 HashRouter 默认路由 */
 }
 
 try {

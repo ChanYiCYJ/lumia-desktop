@@ -2,7 +2,7 @@
  * 静态启动兜底（无 React 依赖）：若渲染进程脚本没有在 6s 内挂载 React，
  * 直接在页面上显示诊断信息（避免「哑白屏」—— 打包版 Windows 疑难白屏的定位关键）。
  */
-(function () {
+;(function () {
   function show(msg) {
     try {
       if (document.getElementById('boot-error')) return
@@ -41,12 +41,18 @@
 
   window.addEventListener('error', function (e) {
     if (e && e.error) {
-      show('Lumia Desktop 启动失败（请把下面内容发给开发者）：\n\n' + (e.error.stack || e.error.message || String(e.error)))
+      show(
+        'Lumia Desktop 启动失败（请把下面内容发给开发者）：\n\n' +
+          (e.error.stack || e.error.message || String(e.error))
+      )
     }
   })
   window.addEventListener('unhandledrejection', function (e) {
     if (e && e.reason) {
-      show('Lumia Desktop 启动失败：\n\n' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)))
+      show(
+        'Lumia Desktop 启动失败：\n\n' +
+          (e.reason && e.reason.message ? e.reason.message : String(e.reason))
+      )
     }
   })
 })()
