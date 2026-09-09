@@ -42,7 +42,11 @@ export function toolArgsPreview(t: ToolCommand): string {
     return String(t.args.path || '')
   if (t.name === 'clipboard_write') return String(t.args.text || '').slice(0, 40)
   if (t.name === 'clipboard_read') return '读取剪贴板'
-  return ''
+  // MCP / 未知工具：参数摘要（key=value…），便于确认弹窗/工具卡识别
+  const parts = Object.entries(t.args || {})
+    .map(([k, v]) => `${k}=${String(v).slice(0, 40)}`)
+    .slice(0, 3)
+  return parts.length ? parts.join(' ').slice(0, 80) : ''
 }
 
 export function stripToolCmds(content: string): string {

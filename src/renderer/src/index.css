@@ -687,22 +687,33 @@ body {
   animation: modalIn 0.2s ease both;
 }
 
-/* ===== 滚动条 ===== */
+/* ===== 滚动条（桌面端细滚动条：弱化占用、hover 加深） ===== */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: rgba(156, 163, 175, 0.45);
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+  background: rgba(107, 114, 128, 0.7);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+/* 暗色模式滚动条（浅灰 thumb 在深底上过亮，收暗一档） */
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.6);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.85);
   border: 2px solid transparent;
   background-clip: content-box;
 }
@@ -755,13 +766,7 @@ body {
   border-top-color: #374151;
 }
 
-/* ===== 暗色模式 — 滚动条 ===== */
-.dark ::-webkit-scrollbar-thumb {
-  background: #4b5563;
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: #6b7280;
-}
+/* ===== 暗色模式 — 滚动条（滚动条样式统一在上方滚动条节处理） ===== */
 
 /* ===== Milkdown 编辑器（AI Chat agent 编辑器，@milkdown/react） ===== */
 /* 结构：编辑器区 > div[data-milkdown-root]（无类）> .milkdown 容器 > .ProseMirror

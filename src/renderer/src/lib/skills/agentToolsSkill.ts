@@ -35,7 +35,7 @@ export function agentToolsSection(ctx: SkillContext): SkillSection | null {
     text +=
       '\n【MCP 扩展工具】以下 MCP 服务器已连接，可调用其工具（名称已加 mcp_ 前缀）：\n' +
       ctx.mcpTools +
-      '\n调用示例：[TOOL:{"name":"mcp_xxx_tool名","args":{...}}]（参数参考该工具 schema）'
+      '\n调用示例：[TOOL:{"name":"mcp_xxx_tool名","args":{...}}]（参数参考该工具 schema）。同一服务器的多次调用共享状态（如浏览器自动化跨步骤不丢页面）。'
   }
   return { id: 'agentTools', text: '\n\n' + text }
 }

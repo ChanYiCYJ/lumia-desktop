@@ -206,8 +206,12 @@ function diversifyByDomain(results: SearchResult[], max: number, perDomain = 2):
 function getAICfg() {
   try {
     // 本地自定义 API 优先（桌面本地模型/用户自配；与 AIChat mergeEffCfg 方向一致）
-    for (const k of Object.keys(localStorage)) {
-      if (!k.startsWith('kimo_ai_local_')) continue
+    // 注意：不能依赖 Object.keys(localStorage) 前缀扫描——部分环境（Electron WebView/测试
+    // polyfill）的存储数据键不可枚举，会漏掉 kimo_ai_local_*，导致本地 AI 在搜索兜底里
+    // 读不到配置（「AI 搜索资料」断在半路）。统一用 length+key(i) 遍历（同 backupSync/secureStorage）
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (!k || !k.startsWith('kimo_ai_local_')) continue
       const lc = JSON.parse(localStorage.getItem(k) || 'null')
       if (lc?.endpoint && lc?.apiKey && lc?.model) {
         return { endpoint: lc.endpoint, apiKey: lc.apiKey, model: lc.model }

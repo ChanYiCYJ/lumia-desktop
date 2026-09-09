@@ -3,9 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <title>Lumia Desktop</title>
+    <!--
+      lumia-live2d: 桌面端 Live2D 资源经主进程自定义协议反代（bestdori/第三方），
+      不走同源 /api 反代（浏览器版才有），必须在 connect-src/img-src 放行，
+      否则 renderer fetch/贴图被 CSP 拦 → Live2D 加载失败。
+    -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; media-src 'self' https: data: blob:; font-src 'self' data: https:; worker-src 'self' blob:"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: lumia-live2d:; connect-src 'self' https: http://localhost:* http://127.0.0.1:* lumia-live2d:; media-src 'self' https: data: blob:; font-src 'self' data: https:; worker-src 'self' blob:"
     />
   </head>
 

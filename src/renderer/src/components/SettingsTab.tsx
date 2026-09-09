@@ -21,9 +21,11 @@ import {
   loadMcpServers,
   saveMcpServers,
   mcpListTools,
+  mcpClose,
   mcpId,
   type McpServerConfig
 } from '../lib/mcp'
+import { COMPUTER_USE_PRESET } from '../lib/computerUse'
 
 /**
  * Agent 面板「设置」tab 的数据/回调集合。
@@ -200,10 +202,27 @@ export function SettingsTab({
     setMcpBusy(null)
   }
   const mcpToggle = (id: string) => {
-    persistMcp(mcpServers.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)))
+    const s = mcpServers.find((x) => x.id === id)
+    const turningOff = !!s && s.enabled !== false
+    persistMcp(mcpServers.map((x) => (x.id === id ? { ...x, enabled: !x.enabled } : x)))
+    // 停用 → 释放该服务器长驻会话（浏览器等子进程不残留）
+    if (turningOff && s) void mcpClose(s)
   }
   const mcpRemove = (id: string) => {
-    persistMcp(mcpServers.filter((s) => s.id !== id))
+    const s = mcpServers.find((x) => x.id === id)
+    persistMcp(mcpServers.filter((x) => x.id !== id))
+    if (s) void mcpClose(s)
+  }
+  // Computer Use 一键添加（复用开源 @playwright/mcp；首次测试连接会自动装 Chromium）
+  const mcpAddComputerUse = () => {
+    if (mcpServers.some((s) => s.name === COMPUTER_USE_PRESET.name)) {
+      setMcpError('已存在「Computer Use」服务器，可在上方列表中开启 / 测试连接')
+      return
+    }
+    persistMcp([...mcpServers, { id: mcpId(), ...COMPUTER_USE_PRESET }])
+    setMcpError(
+      '已添加「Computer Use」（真实浏览器自动化，多步操作保持同一浏览器）。点它的「测试连接」：首次会自动安装 Chromium（需联网，约 1~2 分钟），随后拉取 browser_* 工具'
+    )
   }
   const notionConnected = hasNotionCfg()
   /** 已配置默认数据库 id（用于「在 Notion 中打开数据库」跳转） */
@@ -458,6 +477,22 @@ export function SettingsTab({
             </div>
           ))}
         </div>
+        {/* Computer Use 快捷预设：一键接入官方 Playwright MCP（复用开源，不自研浏览器自动化） */}
+        <button
+          onClick={mcpAddComputerUse}
+          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-gray-300 py-2 text-xs text-gray-500 transition hover:border-gray-400 hover:text-gray-700 dark:border-gray-600 dark:text-gray-400 dark:hover:text-gray-200"
+        >
+          <svg
+            className="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path strokeLinecap="round" d="M12 5v14M5 12h14" />
+          </svg>
+          添加 Computer Use（浏览器自动化 · Playwright）
+        </button>
         {/* 添加 MCP 服务器 */}
         <div className="space-y-1.5 rounded-xl border border-dashed border-gray-200 p-2.5 dark:border-gray-700">
           <input

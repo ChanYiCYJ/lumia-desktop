@@ -1,6 +1,6 @@
 {
   "name": "lumia-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Lumia Desktop — Electron 桌面版 Lumia Agent（来源：lumia-frontend + Cherry Studio 架构，AGPL-3.0）",
   "main": "./out/main/index.js",
   "author": "ChanYiCYJ",

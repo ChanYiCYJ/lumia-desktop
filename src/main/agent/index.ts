@@ -6,7 +6,13 @@ import { ipcMain } from 'electron'
 import * as engine from './engine.mjs'
 import { synthesize } from './tts'
 import { runLocalTool } from './tools'
-import { mcpListTools, mcpCallTool, type McpServerConfig } from './mcp'
+import {
+  mcpListTools,
+  mcpSessionConnect,
+  mcpSessionCall,
+  mcpSessionClose,
+  type McpServerConfig
+} from './mcp'
 import { IPC } from '../../shared/ipc'
 
 export function registerAgentIpc(): void {
@@ -60,17 +66,26 @@ export function registerAgentIpc(): void {
   // 本机工具（终端/文件/剪贴板）—— AI 操作电脑能力
   ipcMain.handle(IPC.Agent_Tool, (_e, req) => runLocalTool(req ?? { tool: '', args: {} }))
 
-  // MCP 服务器（stdio JSON-RPC）—— 技能扩展（filesystem/git/任意 npx MCP）
+  // MCP 服务器（stdio JSON-RPC）—— 技能扩展（filesystem/git/任意 npx MCP）。
+  // list=一次性测试；connect/call=长驻会话（多步共享状态，Computer Use 浏览器自动化必需）；
+  // close=关闭指定服务器会话（停用/删除时释放子进程）。
   ipcMain.handle(IPC.Agent_Mcp, async (_e, req) => {
     const server = (req?.server || {}) as McpServerConfig
     const action = String(req?.action || 'list')
-    if (action === 'list') return mcpListTools(server)
-    if (action === 'call')
-      return mcpCallTool(
-        server,
-        String(req?.tool || ''),
-        (req?.args || {}) as Record<string, unknown>
-      )
-    return { ok: false, tools: [], error: `未知 MCP 动作: ${action}` }
+    const tool = String(req?.tool || '')
+    const args = (req?.args || {}) as Record<string, unknown>
+    switch (action) {
+      case 'list':
+        return mcpListTools(server)
+      case 'connect':
+        return mcpSessionConnect(server)
+      case 'call':
+        return mcpSessionCall(server, tool, args)
+      case 'close':
+        mcpSessionClose(String(server?.id || ''))
+        return { ok: true }
+      default:
+        return { ok: false, tools: [], error: `未知 MCP 动作: ${action}` }
+    }
   })
 }

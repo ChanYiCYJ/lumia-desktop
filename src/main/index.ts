@@ -8,6 +8,7 @@ import { storageGet, storageSet, storageDelete, storageKeys } from './core/store
 import { secretsGet, secretsSet, secretsDelete } from './secrets'
 import { safeStorageEncrypt, safeStorageDecrypt } from './secrets'
 import { registerAgentIpc } from './agent/index'
+import { closeAllMcpSessions } from './agent/mcp'
 import { registerLumiaProtocols } from './protocol'
 import { applyGpuCompat, watchGpuCompat } from './gpu'
 import { logBoot } from './diag'
@@ -181,6 +182,11 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== 'darwin') {
       app.quit()
     }
+  })
+
+  // 退出前回收 MCP 长驻会话子进程（避免残留浏览器/节点进程）
+  app.on('will-quit', () => {
+    closeAllMcpSessions()
   })
 }
 

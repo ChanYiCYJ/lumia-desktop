@@ -661,7 +661,7 @@ function EmptyStateFeatures({
         <button
           key={s}
           onClick={() => onPick(s)}
-          className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 transition hover:border-gray-500 hover:text-gray-900 active:scale-95 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:text-white"
+          className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm transition hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800/70 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700/80 dark:hover:text-white"
         >
           {s}
         </button>
@@ -703,6 +703,26 @@ const AGENT_STATE_KEY = (pageId: number) => `kimo_ai_agent_state_${pageId}`
 const VIEW_TOPIC_KEY = (pageId: number) => `kimo_ai_viewtopic_${pageId}`
 /** 各会话最近生成的 View 文章简介持久化 key（AI 记忆用，避免每次对话重读整篇文章） */
 const VIEW_INTRO_KEY = (pageId: number) => `kimo_view_intro_${pageId}`
+
+/** 当前启用 MCP 服务器的工具清单文本（AI 可用 mcp_<id>_<tool> 调用；本机工具关闭时为空）。
+ *  send 与工具续答都要注入 —— 保证多步工具链（如浏览器操作）期间模型始终知道可用工具 */
+function buildMcpToolsText(on: boolean): string {
+  if (!on) return ''
+  return loadMcpServers()
+    .filter((s) => s.enabled !== false && (s.tools?.length ?? 0) > 0)
+    .map((s) =>
+      (s.tools || [])
+        .map((tool) => `- ${buildMcpToolName(s, tool)}（服务器「${s.name}」）`)
+        .join('\n')
+    )
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** 工具确认弹窗标题分类（MCP 服务器工具 / 本机工具） */
+function toolKindLabel(name: string): string {
+  return parseMcpToolName(name) ? 'MCP 工具' : '本机工具'
+}
 
 /** 判断用户消息是否与当前 View 文章相关（决定是否注入整篇全文 —— token 优化） */
 function viewArticleRelevant(userMsg: string, topic: string): boolean {
@@ -2715,17 +2735,7 @@ export function AIChat({
     // 本站操作文档：用户询问「本站怎么用/怎么操作/有哪些功能」时按需注入（省 token）
     const siteDoc = isSiteDocQuery(t) ? SITE_DOC_TEXT : ''
     // MCP 扩展工具：启用中的服务器 → 工具清单（提示词注入，AI 可用 mcp_<id>_<tool> 调用）
-    const enabledMcp = localToolsOn
-      ? loadMcpServers().filter((s) => s.enabled !== false && (s.tools?.length ?? 0) > 0)
-      : []
-    const mcpToolsText = enabledMcp
-      .map((s) =>
-        (s.tools || [])
-          .map((tool) => `- ${buildMcpToolName(s, tool)}（服务器「${s.name}」）`)
-          .join('\n')
-      )
-      .filter(Boolean)
-      .join('\n')
+    const mcpToolsText = buildMcpToolsText(localToolsOn)
     // 知识融合：用户要求综合多源资料（本地知识库 + 网络结果等）时按需注入（省 token）。
     // 是否有可融合的内容源由 knowledgeFusionSection 内部自行判定（无源时输出空串、零开销）
     const knowledgeFusion = isKnowledgeFusionQuery(t)
@@ -3393,7 +3403,8 @@ export function AIChat({
         '',
         false,
         localToolsOn,
-        r
+        r,
+        buildMcpToolsText(localToolsOn)
       )
       const contReply = stripEmotionTag(cont.content)
       // 续答中若又发起工具调用 → 继续确认（一次一个，形成工具链）
@@ -3879,42 +3890,26 @@ export function AIChat({
       {/* 消息区：沉浸模式隐藏（角色全屏背景），正常模式显示消息列表 */}
       {!live2dImmersive && (
         <>
-          {/* 消息区（铺满的多重水印暗纹网格，不随消息滚动） */}
+          {/* 消息区：干净底色聚焦内容（整版水印已移除，仅 Live2D 沉浸模式保留水印暗纹） */}
           <div className="relative min-h-0 flex-1">
-            <div className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden">
-              <div className="grid h-full grid-cols-2 content-center gap-x-14 gap-y-20 px-4 opacity-20 sm:grid-cols-3">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <span
-                    key={i}
-                    className="rotate-[-16deg] whitespace-nowrap text-[10px] font-medium tracking-[0.2em] text-gray-400/60 dark:text-gray-500/40"
-                  >
-                    AI 生成 · {effCfg.model || 'AI'} · {hasCustom ? '自定义' : '站点'}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <div
-              ref={msgListRef}
-              onScroll={onScroll}
-              className="absolute inset-0 z-10 overflow-y-auto"
-            >
+            <div ref={msgListRef} onScroll={onScroll} className="absolute inset-0 overflow-y-auto">
               <div className="mx-auto w-full max-w-3xl px-3 py-4 sm:px-6 sm:py-6">
                 {/* 角色设定生成中：加载过程（阻止聊天，输入/发送已禁用） */}
                 {loreLoading && <LoreLoadingCard modelName={characterNameOf(currentModel || '')} />}
                 {messages.length === 0 ? (
-                  <div className="flex flex-col items-center pt-[12vh] text-center">
+                  <div className="flex flex-col items-center pt-[9vh] text-center">
                     {config.avatar ? (
                       <img
                         src={config.avatar}
                         alt={config.botName}
-                        className="mb-4 h-16 w-16 rounded-full object-cover"
+                        className="mb-5 h-16 w-16 rounded-full object-cover ring-4 ring-gray-100 dark:ring-gray-800"
                       />
                     ) : (
-                      <span className="mb-4 grid h-16 w-16 place-content-center rounded-full bg-gray-100 text-2xl font-bold text-gray-400 dark:bg-gray-800">
-                        AI
+                      <span className="mb-5 grid h-16 w-16 place-content-center rounded-2xl bg-gradient-to-br from-gray-800 to-gray-500 text-xl font-semibold text-white shadow-lg shadow-gray-200/70 ring-1 ring-gray-900/5 dark:from-gray-100 dark:to-gray-400 dark:text-gray-900 dark:shadow-none dark:ring-white/10">
+                        {(config.botName || 'AI').slice(0, 2)}
                       </span>
                     )}
-                    <p className="text-base font-medium text-gray-700 dark:text-gray-300">
+                    <p className="text-[15px] font-semibold text-gray-800 dark:text-gray-100">
                       {config.botName || 'AI 助手'}
                     </p>
                     <p className="mt-1 text-sm text-gray-400">有什么可以帮你？</p>
@@ -4425,14 +4420,14 @@ export function AIChat({
       <div className="p-2.5 pb-1.5">
         <button
           onClick={newSession}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200/70 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-3 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-700 active:scale-[0.99] dark:bg-gray-200 dark:text-gray-900 dark:hover:bg-gray-300"
         >
           <svg
             className="h-4 w-4"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.2"
           >
             <path strokeLinecap="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
@@ -4814,7 +4809,7 @@ export function AIChat({
           <div className="relative w-full max-w-md rounded-3xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
             <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                本机工具 · {pendingTool.name}
+                {toolKindLabel(pendingTool.name)} · {pendingTool.name}
               </h3>
               <button
                 onClick={() => {
@@ -4836,8 +4831,11 @@ export function AIChat({
             </div>
             <div className="space-y-3 p-4">
               <p className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
-                AI 请求调用本机{pendingTool.name === 'shell' ? '终端' : '文件/剪贴板'}
-                工具，将直接在你的电脑上执行，请确认命令/路径无误。
+                {parseMcpToolName(pendingTool.name)
+                  ? 'AI 请求调用 MCP 服务器工具（如浏览器自动化），将直接在你的电脑上启动子进程 / 浏览器并执行。'
+                  : `AI 请求调用本机${
+                      pendingTool.name === 'shell' ? '终端' : '文件/剪贴板'
+                    }工具，将直接在你的电脑上执行，请确认命令/路径无误。`}
               </p>
               <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                 {toolArgsPreview(pendingTool) || '(无参数)'}
