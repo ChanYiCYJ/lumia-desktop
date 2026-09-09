@@ -53,6 +53,9 @@ export function enableRendererDiag(win: BrowserWindow): void {
   wc.on('did-fail-load', (_e, code, desc, url, isMainFrame) => {
     if (isMainFrame) logBoot(`[did-fail-load] ${code} ${desc} ${url}`)
   })
+  wc.on('preload-error', (_e, preloadPath, error) => {
+    logBoot(`[preload-error] ${preloadPath} → ${error?.message || error}`)
+  })
   wc.on('render-process-gone', (_e, details) => {
     logBoot(`[render-process-gone] reason=${details.reason} exitCode=${details.exitCode}`)
   })
@@ -71,6 +74,37 @@ function selfHealWhiteScreen(): void {
   logBoot('[probe] 白屏自愈：标记软渲（window-gpu-compat=soft）并 relaunch…')
   app.relaunch()
   app.exit(0)
+}
+
+/** 像素级白屏检测（DOM 有内容但画面全白 —— GPU 合成层问题，probe 看不出） */
+let pixelHealDone = false
+function checkPainted(wc: Electron.WebContents): void {
+  wc.capturePage()
+    .then((img) => {
+      const bmp = img.toBitmap()
+      let total = 0
+      let white = 0
+      for (let i = 0; i + 3 < bmp.length; i += 4 * 64) {
+        total++
+        if (bmp[i] > 245 && bmp[i + 1] > 245 && bmp[i + 2] > 245) white++
+      }
+      const ratio = total ? white / total : 0
+      logBoot(
+        `[probe] paint-check 白色像素占比=${ratio.toFixed(3)} (${white}/${total})` +
+          (ratio > 0.98 ? ' → 疑似白屏' : ' → 画面正常')
+      )
+      // 仅在 GPU 模式（用户显式开启硬件加速）下自动处理：白屏 → 软渲重启一次
+      if (ratio > 0.98 && !shouldForceSoftware() && !pixelHealDone) {
+        pixelHealDone = true
+        storageSet('window-gpu-compat', 'soft')
+        logBoot('[probe] 像素白屏命中 → 切软渲并 relaunch…')
+        app.relaunch()
+        app.exit(0)
+      }
+    })
+    .catch((e) => {
+      logBoot(`[probe] paint-check 失败: ${String(e)}`)
+    })
 }
 
 /** 页面加载后轮询探测 React 是否真的挂载（根节点有无内容），区分「白屏但 JS 没跑」 */
@@ -96,6 +130,7 @@ function probeRoot(wc: Electron.WebContents): void {
             logBoot(
               `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → React 已挂载 ✅`
             )
+            checkPainted(wc)
           } else if (s.errOverlay) {
             logBoot(
               `[probe] root.html=${s.html} bodyText=${s.bodyText} nativeApi=${s.nativeApi} errOverlay=true → 已显示启动错误浮层（JS 异常，非 GPU），不自动重启`

@@ -142,6 +142,11 @@ if (!app.requestSingleInstanceLock()) {
     logBoot(
       `[boot] name=${app.getName()} platform=${process.platform} arch=${process.arch} electron=${process.versions.electron} chrome=${process.versions.chrome} node=${process.versions.node} argv=${JSON.stringify(process.argv.slice(1))}`
     )
+    try {
+      logBoot(`[gpu] ${JSON.stringify(app.getGPUFeatureStatus())}`)
+    } catch {
+      /* 个别平台不支持 */
+    }
 
     // GPU 启动异常 → 自动软渲重启（须在窗口创建前挂监听）
     watchGpuCompat()

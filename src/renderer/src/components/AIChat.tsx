@@ -822,9 +822,7 @@ async function streamChat(
   notion = '',
   notionIntent = false,
   localTools = false,
-  toolResult = undefined as
-    | { ok: boolean; output: string; error?: string }
-    | undefined,
+  toolResult = undefined as { ok: boolean; output: string; error?: string } | undefined,
   mcpTools = ''
 ) {
   // skill 模块化：按轮次上下文与开关「just-in-time」组装 system 提示词。
@@ -1675,9 +1673,7 @@ export function AIChat({
   // 桌面版删除同意页：直接进入对话（背景约束已写入设置/文档，无需再弹一次）
   const consented = true
   // 本机工具（终端/文件/剪贴板）：仅桌面（preload 桥存在）且开关开启时注入/执行
-  const [localToolsOn, setLocalToolsOn] = useState(
-    () => hasLocalTools() && loadLocalToolsEnabled()
-  )
+  const [localToolsOn, setLocalToolsOn] = useState(() => hasLocalTools() && loadLocalToolsEnabled())
   const toggleLocalTools = useCallback(() => {
     setLocalToolsOn((v) => {
       const n = !v
@@ -1686,9 +1682,7 @@ export function AIChat({
     })
   }, [])
   // 待确认的本机工具调用（AI 发出 [TOOL:...] 后弹确认，用户点「运行」才执行）
-  const [pendingTool, setPendingTool] = useState<(ToolCommand & { msgIdx: number }) | null>(
-    null
-  )
+  const [pendingTool, setPendingTool] = useState<(ToolCommand & { msgIdx: number }) | null>(null)
   const [toolBusy, setToolBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const msgListRef = useRef<HTMLDivElement>(null)
@@ -2725,11 +2719,10 @@ export function AIChat({
       ? loadMcpServers().filter((s) => s.enabled !== false && (s.tools?.length ?? 0) > 0)
       : []
     const mcpToolsText = enabledMcp
-      .map(
-        (s) =>
-          (s.tools || [])
-            .map((tool) => `- ${buildMcpToolName(s, tool)}（服务器「${s.name}」）`)
-            .join('\n')
+      .map((s) =>
+        (s.tools || [])
+          .map((tool) => `- ${buildMcpToolName(s, tool)}（服务器「${s.name}」）`)
+          .join('\n')
       )
       .filter(Boolean)
       .join('\n')
@@ -3362,11 +3355,7 @@ export function AIChat({
 
   // 本机工具闭环（用户在确认弹窗点击「运行」后）：
   // 执行 → 把结果注入 system（toolResult）→ 继续流式让 AI 基于结果完成任务
-  const continueWithToolResult = async (r: {
-    ok: boolean
-    output: string
-    error?: string
-  }) => {
+  const continueWithToolResult = async (r: { ok: boolean; output: string; error?: string }) => {
     setLoading(true)
     beginStreaming()
     const contUpsert = createStreamThrottle((content: string) => {
@@ -3426,9 +3415,7 @@ export function AIChat({
       updateActive((prev) => {
         const last = prev[prev.length - 1]
         const msg = e instanceof Error ? e.message : '请求失败'
-        return last
-          ? [...prev.slice(0, -1), { ...last, content: `工具续答失败：${msg}` }]
-          : prev
+        return last ? [...prev.slice(0, -1), { ...last, content: `工具续答失败：${msg}` }] : prev
       })
     } finally {
       endStreaming()
@@ -4836,7 +4823,13 @@ export function AIChat({
                 className="grid h-9 w-9 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
                 aria-label="关闭"
               >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  className="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -4864,8 +4857,19 @@ export function AIChat({
                 >
                   {toolBusy && (
                     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
                     </svg>
                   )}
                   {toolBusy ? '执行中…' : '运行'}

@@ -11,6 +11,13 @@
 
   <body>
     <div id="root"></div>
+    <noscript>
+      <div style="padding: 20px; color: #c0392b; font: 13px/1.6 monospace">
+        Lumia Desktop 需要启用 JavaScript 才能运行。
+      </div>
+    </noscript>
+    <!-- 静态启动兜底：渲染未启动时显示诊断（不依赖 React/模块加载） -->
+    <script src="./boot-fallback.js"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

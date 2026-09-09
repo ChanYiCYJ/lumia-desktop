@@ -149,7 +149,9 @@ class McpClient {
 }
 
 /** 初始化并列出工具 */
-export async function mcpListTools(cfg: McpServerConfig): Promise<{ ok: boolean; tools: string[]; error?: string }> {
+export async function mcpListTools(
+  cfg: McpServerConfig
+): Promise<{ ok: boolean; tools: string[]; error?: string }> {
   const client = new McpClient(cfg.command, cfg.args || [])
   try {
     await client.start()
@@ -194,7 +196,11 @@ export async function mcpCallTool(
       .map((c) => (c.type === 'text' ? c.text : ''))
       .filter(Boolean)
       .join('\n')
-    return { ok: !r?.isError, output: text || '(无返回内容)', error: r?.isError ? '工具返回错误' : undefined }
+    return {
+      ok: !r?.isError,
+      output: text || '(无返回内容)',
+      error: r?.isError ? '工具返回错误' : undefined
+    }
   } catch (e) {
     return { ok: false, output: '', error: String((e as Error)?.message || e) }
   } finally {

@@ -11,55 +11,51 @@
  *
  * 注：tsconfig.app.json 已加 node 类型（@types/node），node:fs/node:url 可用。
  */
-import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 
-const SRC = fileURLToPath(
-  new URL("../../components/AIChat.tsx", import.meta.url),
-);
+const SRC = fileURLToPath(new URL('../../components/AIChat.tsx', import.meta.url))
 
 const HOOK_RE =
-  /\b(useState|useRef|useMemo|useCallback|useEffect|useReducer|useId|useSyncExternalStore|useContext|useInsertionEffect|useLayoutEffect)\s*\(/g;
+  /\b(useState|useRef|useMemo|useCallback|useEffect|useReducer|useId|useSyncExternalStore|useContext|useInsertionEffect|useLayoutEffect)\s*\(/g
 
 function hookCalls(): { name: string; line: number }[] {
-  const src = readFileSync(SRC, "utf8");
-  const out: { name: string; line: number }[] = [];
-  src.split("\n").forEach((line, i) => {
-    HOOK_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
+  const src = readFileSync(SRC, 'utf8')
+  const out: { name: string; line: number }[] = []
+  src.split('\n').forEach((line, i) => {
+    HOOK_RE.lastIndex = 0
+    let m: RegExpExecArray | null
     while ((m = HOOK_RE.exec(line)) !== null) {
-      out.push({ name: m[1], line: i + 1 });
+      out.push({ name: m[1], line: i + 1 })
     }
-  });
-  return out;
+  })
+  return out
 }
 
 function firstGateLine(): number {
-  const lines = readFileSync(SRC, "utf8").split("\n");
-  const idx = lines.findIndex((l) => /config\.adminOnly\s*&&\s*!canManage/.test(l));
-  return idx + 1; // 1-based
+  const lines = readFileSync(SRC, 'utf8').split('\n')
+  const idx = lines.findIndex((l) => /config\.adminOnly\s*&&\s*!canManage/.test(l))
+  return idx + 1 // 1-based
 }
 
-describe("AIChat hooks 放置（React Rules of Hooks 回归）", () => {
-  it("所有 hook 调用都位于首个早期 return（adminOnly gate）之前", () => {
-    const gate = firstGateLine();
-    expect(gate).toBeGreaterThan(0);
-    const hooks = hookCalls();
-    const bad = hooks.filter((h) => h.line > gate);
-    expect(bad).toEqual([]);
-  });
+describe('AIChat hooks 放置（React Rules of Hooks 回归）', () => {
+  it('所有 hook 调用都位于首个早期 return（adminOnly gate）之前', () => {
+    const gate = firstGateLine()
+    expect(gate).toBeGreaterThan(0)
+    const hooks = hookCalls()
+    const bad = hooks.filter((h) => h.line > gate)
+    expect(bad).toEqual([])
+  })
 
-  it("确实检测到了 hook 调用（防止正则失效造成「空通过」）", () => {
-    expect(hookCalls().length).toBeGreaterThan(50);
-  });
+  it('确实检测到了 hook 调用（防止正则失效造成「空通过」）', () => {
+    expect(hookCalls().length).toBeGreaterThan(50)
+  })
 
-  it("两个 gate 都存在（adminOnly / 未配置），且同意页已删除", () => {
-    const src = readFileSync(SRC, "utf8");
-    expect(src).not.toMatch(/if\s*\(!consented\)/);
-    expect(src).toMatch(/config\.adminOnly\s*&&\s*!canManage/);
-    expect(src).toMatch(
-      /!effCfg\.endpoint\s*\|\|\s*!effCfg\.apiKey\s*\|\|\s*!effCfg\.model/,
-    );
-  });
-});
+  it('两个 gate 都存在（adminOnly / 未配置），且同意页已删除', () => {
+    const src = readFileSync(SRC, 'utf8')
+    expect(src).not.toMatch(/if\s*\(!consented\)/)
+    expect(src).toMatch(/config\.adminOnly\s*&&\s*!canManage/)
+    expect(src).toMatch(/!effCfg\.endpoint\s*\|\|\s*!effCfg\.apiKey\s*\|\|\s*!effCfg\.model/)
+  })
+})

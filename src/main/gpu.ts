@@ -11,32 +11,25 @@
  * 升级路径=后续加设置项让用户手动切（Cherry 即为设置项+relaunch）。
  */
 import { app } from 'electron'
-import { storageGet, storageSet } from './core/store'
+import { storageSet } from './core/store'
 
 const COMPAT_KEY = 'window-gpu-compat' // 'gpu' | 'soft'
 const STARTUP_WINDOW_MS = 20_000
 
-function storedMode(): string {
-  return storageGet(COMPAT_KEY) === 'soft' ? 'soft' : 'gpu'
-}
-
-/** 本次是否强制软件渲染（须在 app ready 前调用以生效） */
+/**
+ * 本次是否强制软件渲染（须在 app ready 前调用以生效）。
+ * 默认「全平台软渲染」：GPU 初始化失败/远程桌面/虚拟化环境下 Chromium 会以
+ * 白屏呈现（DOM 正常但窗口画不出来——用户「还是白屏」的核心）。
+ * 需要用硬件加速（Live2D 更流畅）时显式 `--gpu` 或 LUMIA_GPU=1 强制。
+ */
 export function shouldForceSoftware(): boolean {
   if (process.env.LUMIA_DISABLE_GPU === '1') return true
   if (process.argv.includes('--disable-gpu')) return true
-  if (process.argv.includes('--gpu')) {
+  if (process.argv.includes('--gpu') || process.env.LUMIA_GPU === '1') {
     storageSet(COMPAT_KEY, 'gpu') // 显式要求硬件 → 清标记
     return false
   }
-  if (process.env.LUMIA_GPU === '1') {
-    storageSet(COMPAT_KEY, 'gpu') // 显式要求硬件 → 清标记
-    return false
-  }
-  if (storedMode() === 'soft') return true
-  // Windows 白屏高发（RDP/虚拟化/老驱动）：默认软件渲染最稳，Live2D 用 SwiftShader 仍可运行；
-  // 需要硬件加速可用 `--gpu` 或 LUMIA_GPU=1 强制
-  if (process.platform === 'win32' && storedMode() !== 'gpu') return true
-  return false
+  return true // 默认软渲染（所有平台）
 }
 
 /** 须在 app.whenReady() 之前调用：按需关闭硬件加速 */
@@ -58,7 +51,7 @@ export function watchGpuCompat(): void {
     relaunched = true
     storageSet(COMPAT_KEY, 'soft')
     console.warn(`[lumia] GPU 进程异常退出（${details.reason}），切换到软件渲染并重启`)
-    app.relaunch()
+    app.relaunch({ args: process.argv.slice(1).concat('--disable-gpu') })
     app.exit(0)
   })
 }

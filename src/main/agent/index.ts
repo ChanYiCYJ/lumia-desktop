@@ -58,9 +58,7 @@ export function registerAgentIpc(): void {
   })
 
   // 本机工具（终端/文件/剪贴板）—— AI 操作电脑能力
-  ipcMain.handle(IPC.Agent_Tool, (_e, req) =>
-    runLocalTool(req ?? { tool: '', args: {} })
-  )
+  ipcMain.handle(IPC.Agent_Tool, (_e, req) => runLocalTool(req ?? { tool: '', args: {} }))
 
   // MCP 服务器（stdio JSON-RPC）—— 技能扩展（filesystem/git/任意 npx MCP）
   ipcMain.handle(IPC.Agent_Mcp, async (_e, req) => {
@@ -68,7 +66,11 @@ export function registerAgentIpc(): void {
     const action = String(req?.action || 'list')
     if (action === 'list') return mcpListTools(server)
     if (action === 'call')
-      return mcpCallTool(server, String(req?.tool || ''), (req?.args || {}) as Record<string, unknown>)
+      return mcpCallTool(
+        server,
+        String(req?.tool || ''),
+        (req?.args || {}) as Record<string, unknown>
+      )
     return { ok: false, tools: [], error: `未知 MCP 动作: ${action}` }
   })
 }
