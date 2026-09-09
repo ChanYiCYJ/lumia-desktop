@@ -59,4 +59,10 @@ export interface SkillContext {
   l2dEnabled?: boolean;
   /** 音频 TTS 模式：注入「回复简短口语化」提示（更适合语音朗读） */
   ttsMode?: boolean;
+  /** 本机工具开启（桌面版）：注入 [TOOL:...] 指令说明 */
+  localTools?: boolean;
+  /** 最近一次本机工具执行结果（要求 AI 基于结果继续回答） */
+  toolResult?: { ok: boolean; output: string; error?: string };
+  /** MCP 工具清单文本（mcp_<id>_<tool>，含服务器名说明） */
+  mcpTools?: string;
 }

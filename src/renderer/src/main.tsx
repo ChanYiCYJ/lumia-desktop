@@ -4,6 +4,12 @@ import { ThemeProvider } from './lib/theme'
 import { aiChat } from './lib/ai'
 import { getCachedLandingRoute } from './lib/site'
 import { enableSecureStorage, migrateLocalSecrets } from './lib/secureStorage'
+// 内置中文字体（Noto Sans SC 简中子集）：Linux/无系统字体的环境不再乱码/方块，
+// 打包版不依赖系统字体（Windows/macOS 也会优先用该字体的中文子集，观感统一）
+import '@fontsource/noto-sans-sc/chinese-simplified-400.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-500.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-600.css'
+import '@fontsource/noto-sans-sc/chinese-simplified-700.css'
 import './index.css'
 import App from './App'
 

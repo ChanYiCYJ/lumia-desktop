@@ -38,6 +38,10 @@ const api = {
   agentNotion: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Notion, req),
   agentTts: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Tts, req),
   agentLive2d: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Live2d, req),
+  /** 本机工具（终端/文件/剪贴板） */
+  agentTool: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Tool, req),
+  /** MCP 服务器（技能扩展） */
+  agentMcp: (req: unknown): Promise<unknown> => ipcRenderer.invoke(IPC.Agent_Mcp, req),
 
   /** 文件对话框（导入/导出） */
   dialogSaveFile: (req: unknown): Promise<string | null> =>

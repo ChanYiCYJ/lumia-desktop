@@ -1,6 +1,7 @@
 import { app, ipcMain, BrowserWindow, dialog, protocol } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { setGlobalDispatcher, ProxyAgent } from 'undici'
 import icon from '../../resources/icon.png?asset'
 import { createMainWindow, registerWindowIpc } from './core/window'
 import { storageGet, storageSet, storageDelete, storageKeys } from './core/store'
@@ -11,6 +12,20 @@ import { registerLumiaProtocols } from './protocol'
 import { applyGpuCompat, watchGpuCompat } from './gpu'
 import { logBoot } from './diag'
 import { IPC, type AppInfo } from '../shared/ipc'
+
+// 主进程 fetch（搜索/抓取/Live2D/TTS/MCP）遵循系统代理：
+// Node/Electron 全局 fetch 默认不读 http_proxy 环境变量，国内网络直连 bestdori 等会超时失败
+try {
+  const proxyUrl =
+    process.env.HTTPS_PROXY ||
+    process.env.https_proxy ||
+    process.env.HTTP_PROXY ||
+    process.env.http_proxy
+  if (proxyUrl) setGlobalDispatcher(new ProxyAgent(proxyUrl))
+  console.log(`[lumia] 主进程 fetch 已启用系统代理: ${proxyUrl || '无'}`)
+} catch (e) {
+  console.warn('[lumia] 代理设置失败（继续直连）:', String(e))
+}
 
 // Windows/远程桌面 GPU 白屏自愈：须在 app ready 前决定是否软渲
 applyGpuCompat()

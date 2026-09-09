@@ -25,6 +25,8 @@ export const IPC = {
   Agent_Notion: 'lumia:agent:notion',
   Agent_Tts: 'lumia:agent:tts',
   Agent_Live2d: 'lumia:agent:live2d',
+  Agent_Tool: 'lumia:agent:tool',
+  Agent_Mcp: 'lumia:agent:mcp',
   Dialog_SaveFile: 'lumia:dialog:save-file',
   Dialog_OpenFile: 'lumia:dialog:open-file'
 } as const

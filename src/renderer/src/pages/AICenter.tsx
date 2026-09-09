@@ -5,7 +5,8 @@ import { mockApi } from '../lib/mock'
 import { AI_CHAT_MARKER, decodeKey, type AIChatConfig } from '../lib/types'
 import { useAuth } from '../lib/auth'
 import { useSite } from '../lib/site'
-import { getAIConfig } from '../lib/ai'
+import { getAIConfig, saveAIConfig } from '../lib/ai'
+import { getLocalCfg, hasLocalCfg } from '../lib/localCfg'
 import { TypeWriter } from '../components/Spinner'
 import { LocalApiModal } from '../components/LocalApiModal'
 import { AIChat, type BotItem } from '../components/AIChat'
@@ -164,6 +165,21 @@ export function AICenter() {
             pageId={0}
             botName="Lumia AI"
             onSaved={() => {
+              // 引导页保存：同时写入全局 AI 配置（kimo_ai_config），
+              // 使 localBotFallback/getAIConfig 立即读到 → 刷新后直接进入对话（修复 pageId=0 存错不生效）
+              try {
+                const cfg = getLocalCfg(0)
+                if (hasLocalCfg(0)) {
+                  saveAIConfig({
+                    endpoint: cfg.endpoint,
+                    apiKey: cfg.apiKey,
+                    model: cfg.model,
+                    enabled: true
+                  })
+                }
+              } catch {
+                /* 忽略 */
+              }
               void loadBots()
             }}
           />
@@ -175,7 +191,7 @@ export function AICenter() {
           </p>
           <p className="max-w-sm text-sm text-gray-400">
             桌面版可直接使用本机模型（Ollama / LM Studio）或任意 OpenAI
-            兼容接口开始对话，无需部署后端。
+            兼容接口开始对话；也可到「Agent 工具箱 → 设置 → 模型管理」统一配置。
           </p>
           <button
             onClick={() => setApiModalOpen(true)}

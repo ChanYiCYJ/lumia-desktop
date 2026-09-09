@@ -70,7 +70,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    // 桌面端防挂起：file:// 或后端不可达时 fetch 可能不 reject（Windows 打包版白屏嫌疑），
+    // 统一 8s 超时 → 抛 TypeError → call() 落入 mock/本地回退，避免界面卡在加载态
+    res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+      signal: options.signal ?? AbortSignal.timeout(8000),
+    });
   } catch {
     throw new TypeError("network error");
   }

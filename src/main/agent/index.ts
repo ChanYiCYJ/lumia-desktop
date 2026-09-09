@@ -5,6 +5,8 @@
 import { ipcMain } from 'electron'
 import * as engine from './engine.mjs'
 import { synthesize } from './tts'
+import { runLocalTool } from './tools'
+import { mcpListTools, mcpCallTool, type McpServerConfig } from './mcp'
 import { IPC } from '../../shared/ipc'
 
 export function registerAgentIpc(): void {
@@ -53,5 +55,20 @@ export function registerAgentIpc(): void {
       : await engine.live2dAsset(path, isApi)
     if (!r.ok) return { ok: false, error: r.error }
     return { ok: true, dataUrl: `data:${r.contentType};base64,${r.buffer!.toString('base64')}` }
+  })
+
+  // 本机工具（终端/文件/剪贴板）—— AI 操作电脑能力
+  ipcMain.handle(IPC.Agent_Tool, (_e, req) =>
+    runLocalTool(req ?? { tool: '', args: {} })
+  )
+
+  // MCP 服务器（stdio JSON-RPC）—— 技能扩展（filesystem/git/任意 npx MCP）
+  ipcMain.handle(IPC.Agent_Mcp, async (_e, req) => {
+    const server = (req?.server || {}) as McpServerConfig
+    const action = String(req?.action || 'list')
+    if (action === 'list') return mcpListTools(server)
+    if (action === 'call')
+      return mcpCallTool(server, String(req?.tool || ''), (req?.args || {}) as Record<string, unknown>)
+    return { ok: false, tools: [], error: `未知 MCP 动作: ${action}` }
   })
 }

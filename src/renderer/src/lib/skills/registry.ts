@@ -18,6 +18,7 @@ import {
 } from "./searchSkill";
 import { kbSections } from "./kbSkill";
 import { live2dSections } from "./live2dSkill";
+import { agentToolsSection, toolResultSection } from "./agentToolsSkill";
 
 /**
  * 按需组装 system 提示词：每个功能是一个独立 skill 段（模块化，避免把不相关的
@@ -49,6 +50,10 @@ export function assembleSystem(ctx: SkillContext): string {
     ...kbSections(),
   ];
   if (ctx.l2dEnabled) sections.push(...live2dSections());
+  const toolsSection = agentToolsSection(ctx);
+  if (toolsSection) sections.push(toolsSection);
+  const tResultSection = toolResultSection(ctx);
+  if (tResultSection) sections.push(tResultSection);
   // 音频 TTS 模式：AI 回复像真人说话一样自然口语化（便于语音朗读），禁止动作描写/旁白；仍可附 Live2D 指令
   if (ctx.ttsMode) {
     sections.push({

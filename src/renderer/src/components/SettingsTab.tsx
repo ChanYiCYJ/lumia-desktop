@@ -17,6 +17,13 @@ import { NotionIcon } from "./ui";
 import { NotionBackupCard } from "./NotionBackupCard";
 import { hasNotionCfg, loadNotionDbId, notionPageUrl } from "../lib/notion";
 import type { KnowledgeStoreMode } from "../lib/kbStore";
+import {
+  loadMcpServers,
+  saveMcpServers,
+  mcpListTools,
+  mcpId,
+  type McpServerConfig,
+} from "../lib/mcp";
 
 /**
  * Agent 面板「设置」tab 的数据/回调集合。
@@ -51,6 +58,9 @@ export interface AgentSettingsProps {
   /** 知识库保存目标（auto/本地/Notion） */
   kbStoreMode?: KnowledgeStoreMode;
   onSetKbStoreMode?: (m: KnowledgeStoreMode) => void;
+  /** 本机工具（终端/文件/剪贴板，AI 操作电脑能力；桌面版） */
+  localToolsOn?: boolean;
+  onToggleLocalTools?: () => void;
 }
 
 /** 设置卡片：细边框 + 无阴影（对齐 Live2D 面板质感），左侧灰色条作为区块标识 */
@@ -126,6 +136,8 @@ export function SettingsTab({
   ttsSource = "backend",
   onSetTtsSource,
   onTestTts,
+  localToolsOn = false,
+  onToggleLocalTools,
 }: AgentSettingsProps) {
   // 自定义模型开关：由 AIChat 统一管理（props 驱动，关闭后不再识别为自定义）；
   // 未传 props 时回退本地逻辑（兼容旧用法）
@@ -137,8 +149,6 @@ export function SettingsTab({
       saveCustomModelOn(!customOn);
     }
   };
-  // 高级设置：模型API配置默认收起，仅高级用户手动展开
-  const [modelApiOpen, setModelApiOpen] = useState(false);
   // 音频 TTS（独立卡片，默认收起表单）：内置后端 / 第三方地址 / 音色 / 试听 / 音量
   const [ttsAudioUrl, setTtsAudioUrl] = useState(() => loadTtsAudioUrl());
   // Notion MCP 连接卡片折叠态（默认折叠）
@@ -155,6 +165,53 @@ export function SettingsTab({
     };
   }, []);
   void notionTick; // 触发重渲染使 hasNotionCfg() 重新求值
+  // 技能与 MCP：服务器列表 + 添加表单 + 测试连接
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>(() => loadMcpServers());
+  const [mcpForm, setMcpForm] = useState({ name: "", command: "", args: "" });
+  const [mcpBusy, setMcpBusy] = useState<string | null>(null);
+  const [mcpError, setMcpError] = useState("");
+  const persistMcp = (list: McpServerConfig[]) => {
+    saveMcpServers(list);
+    setMcpServers(list);
+  };
+  const mcpAdd = () => {
+    const name = mcpForm.name.trim();
+    const command = mcpForm.command.trim();
+    if (!name || !command) {
+      setMcpError("请填写服务器名称与启动命令（如 npx -y @modelcontextprotocol/server-git）");
+      return;
+    }
+    const args = mcpForm.args
+      .split(/\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    persistMcp([
+      ...mcpServers,
+      { id: mcpId(), name, command, args, enabled: true, tools: [] },
+    ]);
+    setMcpForm({ name: "", command: "", args: "" });
+    setMcpError("");
+  };
+  const mcpTest = async (id: string) => {
+    setMcpBusy(id);
+    setMcpError("");
+    const s = mcpServers.find((x) => x.id === id);
+    if (!s) return;
+    const r = await mcpListTools(s);
+    if (r.ok) {
+      persistMcp(mcpServers.map((x) => (x.id === id ? { ...x, tools: r.tools } : x)));
+      setMcpError(r.tools.length ? `已连接，共 ${r.tools.length} 个工具` : "已连接（未发现工具）");
+    } else {
+      setMcpError(`连接失败：${r.error || "未知错误"}`);
+    }
+    setMcpBusy(null);
+  };
+  const mcpToggle = (id: string) => {
+    persistMcp(mcpServers.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)));
+  };
+  const mcpRemove = (id: string) => {
+    persistMcp(mcpServers.filter((s) => s.id !== id));
+  };
   const notionConnected = hasNotionCfg();
   /** 已配置默认数据库 id（用于「在 Notion 中打开数据库」跳转） */
   const notionDbId = notionConnected ? loadNotionDbId() : "";
@@ -168,6 +225,42 @@ export function SettingsTab({
 
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3">
+      {/* 模型管理：统一入口（预设 + 测试连接 + 保存；保存后当前 AI 对话立即生效） */}
+      <Section title="模型管理">
+        {canManage ? (
+          <p className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            当前使用管理员在「AI 管理」中为「{botName}
+            」配置的默认模型；也可在本机覆盖（仅保存在本机，加密存储）。
+          </p>
+        ) : !allowCustomApi ? (
+          <p className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+            管理员已关闭自定义模型设置。
+          </p>
+        ) : (
+          <>
+            <Toggle
+              on={customOn}
+              onClick={toggleCustom}
+              label="使用自定义模型"
+              sub="DeepSeek / Kimi / OpenAI / Ollama / LM Studio / 任意 OpenAI 兼容接口；保存后当前浏览器立即生效"
+            />
+            {customOn && (
+              <>
+                <LocalApiForm
+                  pageId={pageId}
+                  variant="inline"
+                  showEnabledHint={hasCustom}
+                  onSaved={onCustomSaved}
+                />
+                <p className="text-[11px] leading-relaxed text-gray-400">
+                  未配置时使用系统默认模型；配置后自动解除次数与冷却限制。
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </Section>
+
       {/* Notion MCP：连接 + 备份（置顶合并卡片） */}
       <Section title="Notion MCP">
         {/* 连接：开关式折叠 */}
@@ -293,6 +386,118 @@ export function SettingsTab({
         </div>
       </Section>
 
+      {/* 本机工具：AI 操作电脑（终端/文件/剪贴板，桌面版） */}
+      <Section title="本机工具">
+        <Toggle
+          on={localToolsOn}
+          onClick={() => onToggleLocalTools?.()}
+          label="允许 AI 操作电脑"
+          sub="终端 / 文件读写 / 剪贴板；执行前会弹出确认窗口，可随时关闭"
+        />
+        <p className="text-[11px] leading-relaxed text-gray-400">
+          开启后 AI 可通过指令调用本机工具帮你运行命令、查看/修改文件、复制剪贴板；
+          敏感操作（终端命令、写文件）会先经你确认再执行。
+        </p>
+      </Section>
+
+      {/* 技能与 MCP：添加 MCP 服务器（stdio），AI 可调用其工具（如 filesystem/git） */}
+      <Section title="技能与 MCP">
+        <p className="text-[11px] leading-relaxed text-gray-400">
+          内置技能：本机工具 / 联网搜索 / 知识库 / Notion / Live2D（前 4 项可在本页开关）。
+          下方可添加 MCP 服务器扩展能力（兼容 Claude Code / Trae 生态的 npx MCP 包）。
+        </p>
+        {mcpError && (
+          <p className="rounded-xl bg-amber-50 p-2.5 text-[11px] leading-relaxed text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+            {mcpError}
+          </p>
+        )}
+        <div className="space-y-2">
+          {mcpServers.map((s) => (
+            <div
+              key={s.id}
+              className="rounded-xl border border-gray-200 bg-gray-50/60 p-2.5 dark:border-gray-700 dark:bg-gray-800"
+            >
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {s.name}
+                </span>
+                {s.enabled && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    {(s.tools || []).length > 0 ? `${s.tools!.length} 个工具` : "已启用"}
+                  </span>
+                )}
+                <button
+                  onClick={() => void mcpTest(s.id)}
+                  disabled={mcpBusy === s.id}
+                  className="rounded-lg border border-gray-200 bg-white px-2 py-1 text-[11px] text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                >
+                  {mcpBusy === s.id ? "连接中…" : "测试连接"}
+                </button>
+                <button
+                  onClick={() => mcpToggle(s.id)}
+                  role="switch"
+                  aria-checked={s.enabled !== false}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+                    s.enabled !== false ? "bg-gray-900 dark:bg-gray-200" : "bg-gray-300 dark:bg-gray-700"
+                  }`}
+                  title={s.enabled !== false ? "已启用（点击停用）" : "已停用（点击启用）"}
+                >
+                  <span
+                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${
+                      s.enabled !== false ? "left-[18px]" : "left-0.5"
+                    }`}
+                  />
+                </button>
+                <button
+                  onClick={() => mcpRemove(s.id)}
+                  className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-gray-400 transition hover:bg-red-100 hover:text-red-500 dark:hover:bg-red-900/30"
+                  title="删除"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="mt-1 truncate font-mono text-[10px] text-gray-400">
+                {s.command} {(s.args || []).join(" ")}
+              </p>
+              {(s.tools || []).length > 0 && (
+                <p className="mt-1 text-[10px] leading-relaxed text-gray-400">
+                  工具：{(s.tools || []).slice(0, 12).join("、")}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+        {/* 添加 MCP 服务器 */}
+        <div className="space-y-1.5 rounded-xl border border-dashed border-gray-200 p-2.5 dark:border-gray-700">
+          <input
+            value={mcpForm.name}
+            onChange={(e) => setMcpForm({ ...mcpForm, name: e.target.value })}
+            placeholder="服务器名称，如 filesystem"
+            className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          />
+          <input
+            value={mcpForm.command}
+            onChange={(e) => setMcpForm({ ...mcpForm, command: e.target.value })}
+            placeholder="启动命令，如 npx -y @modelcontextprotocol/server-filesystem"
+            className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          />
+          <input
+            value={mcpForm.args}
+            onChange={(e) => setMcpForm({ ...mcpForm, args: e.target.value })}
+            placeholder="参数（空格分隔），如 /path/to/dir"
+            className="w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-gray-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200"
+          />
+          <button
+            onClick={mcpAdd}
+            className="w-full rounded-xl bg-gray-900 py-2 text-xs font-medium text-white transition hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900"
+          >
+            添加服务器
+          </button>
+        </div>
+      </Section>
+
       {/* 搜索 API：第三方搜索平台（Tavily / SearXNG），同搜索模式卡片样式 */}
       <Section title="搜索 API">
         <div className="space-y-2 pt-1">
@@ -394,70 +599,6 @@ export function SettingsTab({
               >
                 试听
               </button>
-            </div>
-          )}
-        </div>
-      </Section>
-
-      {/* 高级设置：模型API配置（原自定义模型）默认收起 */}
-      <Section title="高级设置">
-        {/* 模型API配置：使用自己的接口与密钥（原「自定义模型」并入高级设置） */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setModelApiOpen((v) => !v)}
-            className="flex w-full items-center justify-between py-1 text-left"
-          >
-            <span className="min-w-0">
-              <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                模型API配置
-              </span>
-              <span className="mt-0.5 block text-[11px] leading-relaxed text-gray-400">
-                使用自己的接口与密钥
-              </span>
-            </span>
-            <svg
-              className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${modelApiOpen ? "rotate-180" : ""}`}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-          {modelApiOpen && (
-            <div className="space-y-2 pt-1">
-              {canManage ? (
-                <p className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                  当前使用管理员在「AI 管理」中为「{botName}
-                  」配置的默认模型，无需在 本机填写。
-                </p>
-              ) : !allowCustomApi ? (
-                <p className="rounded-xl bg-gray-50 p-3 text-xs leading-relaxed text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                  管理员已关闭访客自定义模型。
-                </p>
-              ) : (
-                <>
-                  <Toggle
-                    on={customOn}
-                    onClick={toggleCustom}
-                    label="使用自定义模型"
-                  />
-                  {customOn && (
-                    <LocalApiForm
-                      pageId={pageId}
-                      variant="inline"
-                      showEnabledHint={hasCustom}
-                      onSaved={onCustomSaved}
-                    />
-                  )}
-                </>
-              )}
             </div>
           )}
         </div>

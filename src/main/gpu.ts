@@ -28,7 +28,15 @@ export function shouldForceSoftware(): boolean {
     storageSet(COMPAT_KEY, 'gpu') // 显式要求硬件 → 清标记
     return false
   }
-  return storedMode() === 'soft'
+  if (process.env.LUMIA_GPU === '1') {
+    storageSet(COMPAT_KEY, 'gpu') // 显式要求硬件 → 清标记
+    return false
+  }
+  if (storedMode() === 'soft') return true
+  // Windows 白屏高发（RDP/虚拟化/老驱动）：默认软件渲染最稳，Live2D 用 SwiftShader 仍可运行；
+  // 需要硬件加速可用 `--gpu` 或 LUMIA_GPU=1 强制
+  if (process.platform === 'win32' && storedMode() !== 'gpu') return true
+  return false
 }
 
 /** 须在 app.whenReady() 之前调用：按需关闭硬件加速 */

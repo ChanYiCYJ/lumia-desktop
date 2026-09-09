@@ -7,6 +7,8 @@
 import { app, BrowserWindow } from 'electron'
 import { appendFileSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
+import { shouldForceSoftware } from './gpu'
+import { storageSet } from './core/store'
 
 let logFile: string | null = null
 
@@ -60,24 +62,50 @@ export function enableRendererDiag(win: BrowserWindow): void {
   })
 }
 
+/** 白屏自愈：根节点为空且无错误浮层（疑似 GPU/合成层问题）→ 切软渲重启一次 */
+let selfHealDone = false
+function selfHealWhiteScreen(): void {
+  if (selfHealDone || shouldForceSoftware()) return
+  selfHealDone = true
+  storageSet('window-gpu-compat', 'soft')
+  logBoot('[probe] 白屏自愈：标记软渲（window-gpu-compat=soft）并 relaunch…')
+  app.relaunch()
+  app.exit(0)
+}
+
 /** 页面加载后轮询探测 React 是否真的挂载（根节点有无内容），区分「白屏但 JS 没跑」 */
 function probeRoot(wc: Electron.WebContents): void {
   let tries = 0
   const timer = setInterval(() => {
     tries += 1
     wc.executeJavaScript(
-      `(() => { const r = document.getElementById('root'); return { html: r ? r.innerHTML.length : -1, bodyText: (document.body.innerText || '').length, children: document.body ? document.body.children.length : -1, nativeApi: typeof window.api !== 'undefined' && !!window.api } })()`,
+      `(() => { const r = document.getElementById('root'); const oe = document.getElementById('boot-error'); return { html: r ? r.innerHTML.length : -1, bodyText: (document.body.innerText || '').length, children: document.body ? document.body.children.length : -1, nativeApi: typeof window.api !== 'undefined' && !!window.api, errOverlay: !!oe && oe.style.display !== 'none' } })()`,
       true
     )
       .then((v) => {
-        const s = v as { html: number; bodyText: number; children: number; nativeApi: boolean }
+        const s = v as {
+          html: number
+          bodyText: number
+          children: number
+          nativeApi: boolean
+          errOverlay: boolean
+        }
         if (s.html > 0 || s.bodyText > 0 || tries > 12) {
           clearInterval(timer)
-          logBoot(
-            s.html > 0 || s.bodyText > 0
-              ? `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → React 已挂载 ✅`
-              : `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → 根节点仍为空（白屏！见上方 [renderer:*] 错误）`
-          )
+          if (s.html > 0 || s.bodyText > 0) {
+            logBoot(
+              `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → React 已挂载 ✅`
+            )
+          } else if (s.errOverlay) {
+            logBoot(
+              `[probe] root.html=${s.html} bodyText=${s.bodyText} nativeApi=${s.nativeApi} errOverlay=true → 已显示启动错误浮层（JS 异常，非 GPU），不自动重启`
+            )
+          } else {
+            logBoot(
+              `[probe] root.html=${s.html} bodyText=${s.bodyText} children=${s.children} nativeApi=${s.nativeApi} → 根节点仍为空（白屏！见上方 [renderer:*] 错误）`
+            )
+            selfHealWhiteScreen()
+          }
         } else {
           logBoot(
             `[probe] ${tries}/8 root.html=${s.html} bodyText=${s.bodyText} nativeApi=${s.nativeApi}（等待挂载…）`

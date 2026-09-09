@@ -94,6 +94,8 @@ import {
   loadTtsSource,
   saveTtsSource,
   resolveTtsAudioUrl,
+  loadLocalToolsEnabled,
+  saveLocalToolsEnabled,
   type TtsSource,
   type TtsVolume,
   type TtsVoice,
@@ -102,6 +104,9 @@ import {
   type ChatSearchSpeed,
   type ChatSearchDepth
 } from '../lib/chatSettings'
+import { hasLocalTools, runLocalTool } from '../lib/localTools'
+import { buildMcpToolName, loadMcpServers, mcpCall, parseMcpToolName } from '../lib/mcp'
+import { extractToolCommands, toolArgsPreview } from '../lib/toolCmds'
 import { LocalApiModal } from './LocalApiModal'
 import { ArticleComposerModal } from './ArticleComposerModal'
 import { AgentPanel } from './AgentPanel'
@@ -168,7 +173,7 @@ interface Message {
  * 从 AI 回复显示文本中过滤工具指令（[SEARCH:] / [BROWSE:] / [EDIT:] / [KB-*] 等），
  * 它们由 toolCalls 小卡片承载展示，避免在消息里露出原始标记。
  */
-import { stripToolCmds } from '../lib/toolCmds'
+import { stripToolCmds, type ToolCommand } from '../lib/toolCmds'
 // 性能优化：低性能设备检测 + 流式更新节流（同一帧/短窗口内合并多次 chunk 更新）
 import { createStreamThrottle, isLowPerfDevice, trackAICall } from '../lib/perf'
 // skill 模块化提示词：每个功能一个独立提示词段，按轮次 just-in-time 组装 system
@@ -288,7 +293,8 @@ const TOOL_DOT: Record<string, string> = {
   优化文章: 'bg-indigo-500',
   网络资料: 'bg-amber-500',
   编辑文档: 'bg-orange-500',
-  打开知识库: 'bg-teal-500'
+  打开知识库: 'bg-teal-500',
+  本地工具: 'bg-slate-500'
 }
 
 /**
@@ -814,7 +820,12 @@ async function streamChat(
   siteDoc = '',
   knowledgeFusion = false,
   notion = '',
-  notionIntent = false
+  notionIntent = false,
+  localTools = false,
+  toolResult = undefined as
+    | { ok: boolean; output: string; error?: string }
+    | undefined,
+  mcpTools = ''
 ) {
   // skill 模块化：按轮次上下文与开关「just-in-time」组装 system 提示词。
   // 每个功能一个独立 skill 段（搜索/知识库/View/人格/记忆/Live2D），只注入相关段，
@@ -840,7 +851,10 @@ async function streamChat(
     autoMode,
     fastMode,
     l2dEnabled,
-    ttsMode
+    ttsMode,
+    localTools,
+    toolResult,
+    mcpTools
   })
   const t0 = performance.now()
   const res = await fetch(cfg.endpoint.replace(/\/+$/, '') + '/chat/completions', {
@@ -1658,13 +1672,24 @@ export function AIChat({
   })
   const [memory, setMemory] = useState(() => loadMemory(pageId))
   const customApiEnabled = enableCustomApi !== false
-  const [consented, setConsented] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_PREFIX + 'consent_' + pageId) === '1'
-    } catch {
-      return false
-    }
-  })
+  // 桌面版删除同意页：直接进入对话（背景约束已写入设置/文档，无需再弹一次）
+  const consented = true
+  // 本机工具（终端/文件/剪贴板）：仅桌面（preload 桥存在）且开关开启时注入/执行
+  const [localToolsOn, setLocalToolsOn] = useState(
+    () => hasLocalTools() && loadLocalToolsEnabled()
+  )
+  const toggleLocalTools = useCallback(() => {
+    setLocalToolsOn((v) => {
+      const n = !v
+      saveLocalToolsEnabled(n)
+      return n
+    })
+  }, [])
+  // 待确认的本机工具调用（AI 发出 [TOOL:...] 后弹确认，用户点「运行」才执行）
+  const [pendingTool, setPendingTool] = useState<(ToolCommand & { msgIdx: number }) | null>(
+    null
+  )
+  const [toolBusy, setToolBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const msgListRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -2695,6 +2720,19 @@ export function AIChat({
     const viewIntroText = viewTopic ? viewIntro : ''
     // 本站操作文档：用户询问「本站怎么用/怎么操作/有哪些功能」时按需注入（省 token）
     const siteDoc = isSiteDocQuery(t) ? SITE_DOC_TEXT : ''
+    // MCP 扩展工具：启用中的服务器 → 工具清单（提示词注入，AI 可用 mcp_<id>_<tool> 调用）
+    const enabledMcp = localToolsOn
+      ? loadMcpServers().filter((s) => s.enabled !== false && (s.tools?.length ?? 0) > 0)
+      : []
+    const mcpToolsText = enabledMcp
+      .map(
+        (s) =>
+          (s.tools || [])
+            .map((tool) => `- ${buildMcpToolName(s, tool)}（服务器「${s.name}」）`)
+            .join('\n')
+      )
+      .filter(Boolean)
+      .join('\n')
     // 知识融合：用户要求综合多源资料（本地知识库 + 网络结果等）时按需注入（省 token）。
     // 是否有可融合的内容源由 knowledgeFusionSection 内部自行判定（无源时输出空串、零开销）
     const knowledgeFusion = isKnowledgeFusionQuery(t)
@@ -2748,7 +2786,10 @@ export function AIChat({
         siteDoc,
         knowledgeFusion,
         notion,
-        notionIntent
+        notionIntent,
+        localToolsOn,
+        undefined,
+        mcpToolsText
       )
       reply = result.content
     } catch (e: unknown) {
@@ -2819,6 +2860,8 @@ export function AIChat({
     const viewCmd = viewClosed || viewOpen
     const kbCmd = reply.match(/\[(?:KB|OPEN_KB|知识库)(?::\s*([^\]]+))?\]/)
     const kbSaveCmd = parseKbTool(reply)
+    // 本机工具调用（[TOOL:{"name":"shell","args":{"cmd":"ls"}}]）——桌面版 AI 操作电脑
+    const toolCmds = localToolsOn ? extractToolCommands(reply) : []
     // 工具卡/内嵌浏览挂到 AI 消息底部（messages 是发送前的快照：用户消息在 messages.length，AI 回复在 +1）
     const msgIdx = messages.length + 1
     // 电脑端工具触发后自动打开 Agent 面板；手机端仅展示小卡片，用户点击卡片才打开
@@ -3223,7 +3266,8 @@ export function AIChat({
       !browseCmd &&
       !searchCmd &&
       !editCmd &&
-      !kbCmd
+      !kbCmd &&
+      !toolCmds.length
     ) {
       const isCode = /```/.test(reply) || /```[a-zA-Z]*\n/.test(reply)
       if (!isCode) {
@@ -3241,6 +3285,31 @@ export function AIChat({
       }
     }
     // 网络资料不再以卡片展示（浏览结果由浏览面板自动呈现），避免刷屏
+
+    // 本机工具：AI 请求操作电脑（[TOOL:...]）→ 剥离指令进入「确认 → 执行 → 续答」闭环
+    if (toolCmds.length) {
+      const cleaned = stripToolCmds(reply)
+      reply = cleaned
+      updateActive((prev) => {
+        for (let i = prev.length - 1; i >= 0; i--) {
+          if (prev[i].role === 'assistant') {
+            return prev.map((m, j) => (j === i ? { ...m, content: cleaned } : m))
+          }
+        }
+        return prev
+      })
+      const first = toolCmds[0]
+      setPendingTool({ ...first, msgIdx })
+      setToolCalls((prev) => [
+        ...prev,
+        {
+          msgIdx,
+          type: '本地工具',
+          detail: `待确认 · ${first.name} ${toolArgsPreview(first)}`.slice(0, 60),
+          sessionId: activeId
+        }
+      ])
+    }
 
     if (!reply.startsWith('错误')) learn(t, reply)
     // Token 优化：简短回复（如"好的，我帮你查一下"）或仅含工具指令（[SEARCH:]/[VIEW:] 等）的
@@ -3289,6 +3358,111 @@ export function AIChat({
           personaRunningRef.current = false
         })
     }
+  }
+
+  // 本机工具闭环（用户在确认弹窗点击「运行」后）：
+  // 执行 → 把结果注入 system（toolResult）→ 继续流式让 AI 基于结果完成任务
+  const continueWithToolResult = async (r: {
+    ok: boolean
+    output: string
+    error?: string
+  }) => {
+    setLoading(true)
+    beginStreaming()
+    const contUpsert = createStreamThrottle((content: string) => {
+      updateActive((prev) => {
+        const last = prev[prev.length - 1]
+        return last && last.role === 'assistant'
+          ? [...prev.slice(0, -1), { role: 'assistant' as const, content }]
+          : [...prev, { role: 'assistant' as const, content }]
+      })
+    })
+    try {
+      updateActive((prev) => [...prev, { role: 'assistant' as const, content: '' }])
+      const cont = await streamChat(
+        effCfg,
+        messages,
+        contUpsert,
+        abortRef.current?.signal ?? new AbortController().signal,
+        '',
+        kbText,
+        memory,
+        '',
+        searchMode !== 'fast',
+        browseAgentOn,
+        '',
+        '',
+        personaKnowledge,
+        searchMode === 'auto',
+        searchMode === 'fast',
+        lorePrompt,
+        personaMode === 'role',
+        l2dEnabled,
+        ttsOn && (ttsSource === 'backend' || !!loadTtsAudioUrl()),
+        '',
+        false,
+        '',
+        false,
+        localToolsOn,
+        r
+      )
+      const contReply = stripEmotionTag(cont.content)
+      // 续答中若又发起工具调用 → 继续确认（一次一个，形成工具链）
+      const nextTools = localToolsOn ? extractToolCommands(contReply) : []
+      if (nextTools.length) {
+        const cleaned = stripToolCmds(contReply)
+        updateActive((prev) => {
+          const last = prev[prev.length - 1]
+          return last ? [...prev.slice(0, -1), { ...last, content: cleaned }] : prev
+        })
+        setPendingTool({ ...nextTools[0], msgIdx: messages.length + 1 })
+      } else {
+        updateActive((prev) => {
+          const last = prev[prev.length - 1]
+          return last ? [...prev.slice(0, -1), { ...last, content: contReply }] : prev
+        })
+      }
+    } catch (e: unknown) {
+      updateActive((prev) => {
+        const last = prev[prev.length - 1]
+        const msg = e instanceof Error ? e.message : '请求失败'
+        return last
+          ? [...prev.slice(0, -1), { ...last, content: `工具续答失败：${msg}` }]
+          : prev
+      })
+    } finally {
+      endStreaming()
+      setLoading(false)
+    }
+  }
+
+  const runPendingTool = async (tc: ToolCommand & { msgIdx: number }) => {
+    setToolBusy(true)
+    // mcp_ 前缀 → MCP 服务器工具；其余 → 本机工具
+    const mcpParsed = parseMcpToolName(tc.name)
+    let r: { ok: boolean; output: string; error?: string }
+    if (mcpParsed) {
+      const server = loadMcpServers().find((s) => s.id === mcpParsed.serverId)
+      r = server
+        ? await mcpCall(server, mcpParsed.tool, (tc.args || {}) as Record<string, unknown>)
+        : { ok: false, output: '', error: '未找到对应的 MCP 服务器，请到 设置 → 技能与 MCP 检查' }
+    } else {
+      r = await runLocalTool({ tool: tc.name, args: tc.args })
+    }
+    setToolBusy(false)
+    setPendingTool(null)
+    if (!r.ok) {
+      // 失败：在对话里补一条失败说明（保持上下文清楚）
+      updateActive((prev) => [
+        ...prev,
+        {
+          role: 'assistant' as const,
+          content: `工具「${tc.name}」执行失败：${r.error || '未知错误'}`
+        }
+      ])
+      return
+    }
+    await continueWithToolResult(r)
   }
 
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
@@ -3363,7 +3537,9 @@ export function AIChat({
       onSetTtsSource: setTtsSourcePersist,
       onTestTts: testTts,
       kbStoreMode,
-      onSetKbStoreMode: changeKbStoreMode
+      onSetKbStoreMode: changeKbStoreMode,
+      localToolsOn,
+      onToggleLocalTools: toggleLocalTools
     }),
     [
       pageId,
@@ -3386,103 +3562,11 @@ export function AIChat({
       testTts,
       kbStoreMode,
       changeKbStoreMode,
-      refreshKb
+      refreshKb,
+      localToolsOn,
+      toggleLocalTools
     ]
   )
-
-  if (!consented) {
-    return (
-      // 手机适配：h-full 占满父容器 + 外层滚动；子元素 m-auto —— 内容少居中、内容多可从顶滚到底部（同意按钮可滚动到）
-      <div className="flex h-full w-full overflow-y-auto bg-gray-50 px-4 py-8 dark:bg-gray-950">
-        {/* 入场动画：缩放 + 淡入（比大幅上滑更柔和，适合全屏居中卡片） */}
-        <div className="m-auto w-full max-w-xl animate-[kpop_0.45s_ease-out] overflow-hidden rounded-3xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-          {/* 顶部：纯文字欢迎（无彩色图标） */}
-          <div className="animate-[kfade_0.4s_ease-out_0.05s_both] bg-gradient-to-b from-gray-50 to-transparent px-6 pb-6 pt-8 text-center dark:from-gray-800/40">
-            <h3 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-              {config.botName || 'AI 助手'}
-            </h3>
-            <p className="mt-1 text-sm text-gray-400">开始使用前，请阅读并同意以下须知</p>
-          </div>
-
-          {/* 须知卡片区（Kimo 风格：圆角卡片 + 左侧灰条标题） */}
-          <div className="space-y-2.5 px-5 pb-6 sm:px-7">
-            <section className="animate-[kfade_0.4s_ease-out_0.12s_both] rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
-              <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400">
-                <span className="h-3 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                数据与隐私
-              </p>
-              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                <li>对话记录、角色设定、自定义 API 均保存在您的本机浏览器，不会上传服务器。</li>
-                <li>API 密钥仅用于在本机调用模型接口，网站不存储、不读取您的密钥。</li>
-              </ul>
-            </section>
-            <section className="animate-[kfade_0.4s_ease-out_0.2s_both] rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
-              <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400">
-                <span className="h-3 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                内容声明
-              </p>
-              <ul className="mt-2 space-y-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                <li>AI 回复由第三方模型生成，仅供参考，请自行判断准确性，重要信息请核实。</li>
-                <li>受 Token 额度限制，回复长度或频率可能受限。</li>
-                <li>请勿输入密码、身份证号等个人敏感信息；请勿生成违法违规内容。</li>
-                <li>AI 会以 Live2D 虚拟形象与你互动，表情与动作在本机实时渲染，不额外上传数据。</li>
-                <li>联网搜索 / 文章生成等工具会在您发起时获取公开网页信息，仅用于本次回答。</li>
-              </ul>
-            </section>
-            <section className="animate-[kfade_0.4s_ease-out_0.28s_both] rounded-2xl border border-gray-100 bg-gray-50/60 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
-              <p className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-gray-500 dark:text-gray-400">
-                <span className="h-3 w-1 rounded-full bg-gray-300 dark:bg-gray-600" />
-                联系与反馈
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                如有问题或建议，欢迎到{' '}
-                <a
-                  href="https://github.com/ChanYiCYJ/lumia-frontend/issues"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 hover:underline dark:text-blue-400"
-                >
-                  GitHub Issues
-                </a>{' '}
-                反馈。
-              </p>
-            </section>
-
-            <button
-              onClick={() => {
-                setConsented(true)
-                try {
-                  localStorage.setItem(STORAGE_PREFIX + 'consent_' + pageId, '1')
-                } catch {}
-              }}
-              className="mt-4 flex w-full animate-[kfade_0.4s_ease-out_0.36s_both] items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white py-3 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 active:scale-[0.98] dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-            >
-              <svg
-                className="h-4 w-4 text-gray-400"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              我已阅读并同意 · 开始对话
-            </button>
-            <Link
-              to="/"
-              className="block animate-[kfade_0.4s_ease-out_0.42s_both] text-center text-xs text-gray-400 transition hover:text-gray-600"
-            >
-              返回网站首页
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   // 仅管理员可用的助手：普通访客无法访问
   if (config.adminOnly && !canManage) {
@@ -4731,6 +4815,66 @@ export function AIChat({
         onSaved={onCustomSaved}
       />
       <ArticleComposerModal open={articleOpen} onClose={() => setArticleOpen(false)} />
+      {/* 本机工具确认弹窗：AI 请求操作电脑（终端/文件/剪贴板）→ 用户确认后才执行 */}
+      {pendingTool && (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => {
+              if (!toolBusy) setPendingTool(null)
+            }}
+          />
+          <div className="relative w-full max-w-md rounded-3xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-700">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                本机工具 · {pendingTool.name}
+              </h3>
+              <button
+                onClick={() => {
+                  if (!toolBusy) setPendingTool(null)
+                }}
+                className="grid h-9 w-9 place-items-center rounded-full text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
+                aria-label="关闭"
+              >
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-3 p-4">
+              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                AI 请求调用本机{pendingTool.name === 'shell' ? '终端' : '文件/剪贴板'}
+                工具，将直接在你的电脑上执行，请确认命令/路径无误。
+              </p>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-gray-50 p-3 text-[11px] leading-relaxed text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                {toolArgsPreview(pendingTool) || '(无参数)'}
+              </pre>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => setPendingTool(null)}
+                  disabled={toolBusy}
+                  className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => void runPendingTool(pendingTool)}
+                  disabled={toolBusy}
+                  className="flex items-center gap-2 rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-gray-700 disabled:opacity-50 dark:bg-gray-100 dark:text-gray-900"
+                >
+                  {toolBusy && (
+                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  )}
+                  {toolBusy ? '执行中…' : '运行'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {live2dImmersive && <Live2DBackground />}
       {layout}
     </>

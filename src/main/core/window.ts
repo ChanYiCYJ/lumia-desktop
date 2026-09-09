@@ -5,7 +5,7 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import { storageGet, storageSet } from './store'
-import { enableRendererDiag } from '../diag'
+import { enableRendererDiag, logBoot } from '../diag'
 
 const WINDOW_STATE_KEY = 'window-state'
 
@@ -44,6 +44,15 @@ export function createMainWindow(icon?: string): BrowserWindow {
   if (saved.maximized) win.maximize()
 
   win.on('ready-to-show', () => win.show())
+
+  // 显示兜底：某些环境（Windows RDP/虚拟化/GPU 异常）ready-to-show 可能长时间不触发，
+  // 但页面其实已加载 —— 3s 后强制显示窗口，避免「窗口一直不出现/白屏无响应」观感
+  setTimeout(() => {
+    if (!win.isDestroyed() && !win.isVisible()) {
+      win.show()
+      logBoot('[win] ready-to-show 未触发，3s 兜底强制 show()')
+    }
+  }, 3000)
 
   // 关闭时保存窗口状态
   const saveState = (): void => {

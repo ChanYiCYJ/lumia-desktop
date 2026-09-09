@@ -174,6 +174,15 @@ export function saveTtsOn(on: boolean): void {
   lsSet(KEY_TTS_ON, on ? "1" : "0");
 }
 
+// ---- 本机工具（终端/文件/剪贴板，桌面版 AI 操作电脑能力；默认开启）----
+const KEY_LOCAL_TOOLS = "kimo_local_tools_enabled";
+export function loadLocalToolsEnabled(): boolean {
+  return lsGet(KEY_LOCAL_TOOLS) !== "0";
+}
+export function saveLocalToolsEnabled(on: boolean): void {
+  lsSet(KEY_LOCAL_TOOLS, on ? "1" : "0");
+}
+
 // ---- TTS 音量（朗读音频输出控制）----
 export type TtsVolume = "low" | "medium" | "high";
 const KEY_TTS_VOLUME = "kimo_ai_tts_volume";

@@ -54,6 +54,11 @@ export function notion(req: {
   return window.api.agentNotion(req)
 }
 
+/** 本机工具（终端/文件/剪贴板） */
+export function tool(req: { tool: string; args?: Record<string, unknown> }): Promise<unknown> {
+  return window.api.agentTool(req)
+}
+
 /** TTS：返回 Blob URL（主进程合成/代理下载） */
 export async function tts(req: {
   text: string
